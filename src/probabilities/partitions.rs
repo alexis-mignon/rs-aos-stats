@@ -49,6 +49,7 @@ pub fn generate_partitions_probabilities(
     let n_partitions = probabilities.len();
     let partitions = generate_partitions(n_partitions, n_elements);
     let mut partitions_probabilities = Vec::new();
+    //println!("probabilities: {:?}", probabilities);
     let multinomial = Multinomial::new(&probabilities, n_elements as u64).unwrap();
 
     for partition in partitions {

@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use regex::Regex;
+use std::fmt;
 
 #[derive(Debug, Clone, Copy)]
 pub enum DiceRoll {
@@ -8,6 +10,8 @@ pub enum DiceRoll {
     ND3(u32),
     D6Plus(u32),
     D3Plus(u32),
+    ND3Plus(u32, u32),
+    ND6Plus(u32, u32),
 }
 
 impl DiceRoll {
@@ -19,6 +23,14 @@ impl DiceRoll {
             DiceRoll::D3Plus(n) => (1..=3).map(|x| (x + n, 1.0 / 3.0)).collect(),
             DiceRoll::ND6(n) => _generate_dice_rolls(*n as usize, 6),
             DiceRoll::ND3(n) => _generate_dice_rolls(*n as usize, 3),
+            DiceRoll::ND3Plus(n, m) => _generate_dice_rolls(*n as usize, 3)
+                .iter()
+                .map(|(x, proba)| (*x + m, *proba))
+                .collect(),
+            DiceRoll::ND6Plus(n, m) => _generate_dice_rolls(*n as usize, 6)
+                .iter()
+                .map(|(x, proba)| (*x + m, *proba))
+                .collect(),
         }
     }
 }
@@ -62,43 +74,55 @@ fn _generate_dice_rolls_recursive(
     }
 }
 
+impl DiceRoll {
+    pub fn from_str(dice_str: String) -> Result<DiceRoll, DiceRollParseError> {
+        let re = Regex::new(r"(?<n>\d+)?D(?<faces>[36])(\+(?<bonus>\d+))?").map_err(|_| DiceRollParseError::InvalidRegex)?;
+        
+        if let Some(captures) = re.captures(&dice_str) {
+            let n = captures.name("n").map_or(1, |m| m.as_str().parse().unwrap());
+            let faces = captures.name("faces").map(|m| m.as_str().parse().unwrap()).unwrap();
+            let bonus = captures.name("bonus").map_or(0, |m| m.as_str().parse().unwrap());
 
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub enum TestRollOutcome {
-    Critical=2,
-    Success=1,
-    Failure=0
+            if n == 1 {
+                match faces {
+                    3 => match bonus {
+                        0 => Ok(DiceRoll::D3),
+                        _ => Ok(DiceRoll::D3Plus(bonus)),
+                    },
+                    6 => match bonus {
+                        0 => Ok(DiceRoll::D6),
+                        _ => Ok(DiceRoll::D6Plus(bonus)),
+                    },
+                    _ => Err(DiceRollParseError::InvalidFaceNumber),
+                }
+            } else {
+                match faces {
+                    3 => match bonus {
+                        0 => Ok(DiceRoll::ND3(n)),
+                        _ => Ok(DiceRoll::ND3Plus(n, bonus)),
+                    },
+                    6 => match bonus {
+                        0 => Ok(DiceRoll::ND6(n)),
+                        _ => Ok(DiceRoll::ND6Plus(n, bonus)),
+                    },
+                    _ => Err(DiceRollParseError::InvalidFaceNumber),
+                }
+            }
+        } else {
+            Err(DiceRollParseError::InvalidFormat)
+        }
+    }
 }
 
-impl TestRollOutcome {
-    pub fn outcome(roll: u32, threshold: u32, modifier: Option<u32>, has_critical: bool) -> TestRollOutcome{
-        let modifier = modifier.unwrap_or(0);
+#[derive(Debug, Clone)]
+pub enum DiceRollParseError {
+    InvalidRegex,
+    InvalidFaceNumber,
+    InvalidFormat
+}
 
-        if roll == 1 {TestRollOutcome::Failure}
-        else if has_critical && roll == 6 {TestRollOutcome::Critical}
-        else if roll + modifier >= threshold {TestRollOutcome::Success}
-        else {TestRollOutcome::Failure}
-    }
-
-    pub fn output_counts(threshold: u32, modifier: Option<u32>, has_critical: bool) -> HashMap<TestRollOutcome, u32>{
-        let mut outcome_counts = HashMap::new();
-
-        (1..=6).for_each(|roll| {
-            let outcome = TestRollOutcome::outcome(roll, threshold, modifier, has_critical);
-            *outcome_counts.entry(outcome).or_insert(0) += 1;
-        });
-
-        outcome_counts      
-    }
-
-    pub fn output_probabilities(threshold: u32, modifier: Option<u32>, has_critical: bool) -> HashMap<TestRollOutcome, f64> {
-        let mut outcome_probabilities = HashMap::new();
-
-        (1..=6).for_each(|roll| {
-            let outcome = TestRollOutcome::outcome(roll, threshold, modifier, has_critical);
-            *outcome_probabilities.entry(outcome).or_insert(0.0) += 1.0 / 6.0;
-        });
-
-        outcome_probabilities
+impl fmt::Display for DiceRollParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
