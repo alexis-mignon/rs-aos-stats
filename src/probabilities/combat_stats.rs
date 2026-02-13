@@ -103,7 +103,7 @@ pub struct DefenseStats {
 
 impl DefenseStats {
     pub fn new(to_save: u32, ward: Option<u32>) -> DefenseStats {
-        DefenseStats { to_save: to_save, ward: ward }
+        DefenseStats { to_save, ward }
     }
 
     pub fn with_to_save(&self, value: u32) -> DefenseStats {
@@ -255,5 +255,151 @@ mod tests {
         assert_eq!(vp.len(), 6);
         let total: f64 = vp.iter().map(|(_, p)| p).sum();
         assert!((total - 1.0).abs() < 1e-10);
+    }
+
+    /// Test all AttackStats builder methods (with_*) to ensure they
+    /// correctly modify individual fields while preserving others.
+    #[test]
+    fn attack_stats_with_methods() {
+        let stats = AttackStats::new(
+            Characteristic::Value(5),
+            3, 4, 1,
+            Characteristic::Value(2)
+        );
+
+        // Test with_attacks
+        let modified = stats.with_attacks(Characteristic::Value(10));
+        assert_eq!(modified.attacks.values_and_probas(), vec![(10, 1.0)]);
+        assert_eq!(modified.to_hit, 3);
+
+        // Test with_to_hit
+        let modified = stats.with_to_hit(2);
+        assert_eq!(modified.to_hit, 2);
+        assert_eq!(modified.to_wound, 4);
+
+        // Test with_to_wound
+        let modified = stats.with_to_wound(5);
+        assert_eq!(modified.to_wound, 5);
+        assert_eq!(modified.rend, 1);
+
+        // Test with_rend
+        let modified = stats.with_rend(3);
+        assert_eq!(modified.rend, 3);
+
+        // Test with_damages
+        let modified = stats.with_damages(Characteristic::Value(3));
+        assert_eq!(modified.damages.values_and_probas(), vec![(3, 1.0)]);
+        assert_eq!(modified.to_hit, 3);
+    }
+
+    /// Test DefenseStats builder methods (with_*) including the
+    /// special behavior of with_ward that converts 0 to None.
+    #[test]
+    fn defense_stats_with_methods() {
+        let stats = DefenseStats::new(4, None);
+
+        // Test with_to_save
+        let modified = stats.with_to_save(3);
+        assert_eq!(modified.to_save, 3);
+        assert_eq!(modified.ward, None);
+
+        // Test with_ward with positive value
+        let modified = stats.with_ward(5);
+        assert_eq!(modified.ward, Some(5));
+
+        // Test with_ward with zero (should be None per business logic)
+        let modified = stats.with_ward(0);
+        assert_eq!(modified.ward, None);
+
+        // Test with_ward preserves to_save
+        let stats = DefenseStats::new(4, Some(6));
+        let modified = stats.with_ward(5);
+        assert_eq!(modified.to_save, 4);
+        assert_eq!(modified.ward, Some(5));
+    }
+
+    /// Test RollModifier::new_null creates a modifier with all zeros.
+    #[test]
+    fn roll_modifier_new_null() {
+        let m = RollModifier::new_null();
+        assert_eq!(m.to_hit, 0);
+        assert_eq!(m.to_wound, 0);
+        assert_eq!(m.to_save, 0);
+    }
+
+    /// Test apply_to_wound_modifier behaves correctly with positive
+    /// and negative modifiers, including clamping.
+    #[test]
+    fn apply_to_wound_modifier() {
+        // Positive modifier
+        let m = RollModifier::new(0, 1, 0);
+        assert_eq!(m.apply_to_wound_modifier(3), 4);
+
+        // Negative modifier
+        let m = RollModifier::new(0, -1, 0);
+        assert_eq!(m.apply_to_wound_modifier(3), 2);
+
+        // Clamped modifier (should behave as +1)
+        let m = RollModifier::new(0, 5, 0);
+        assert_eq!(m.apply_to_wound_modifier(3), 4);
+    }
+
+    /// Test that modifiers resulting in negative values are clamped to 0.
+    #[test]
+    fn apply_modifier_negative_result() {
+        // Large negative modifier on small value should result in 0
+        let m = RollModifier::new(-10, 0, 0);
+        assert_eq!(m.apply_to_hit_modifier(1), 0);
+
+        let m = RollModifier::new(0, -10, 0);
+        assert_eq!(m.apply_to_wound_modifier(1), 0);
+    }
+
+    /// Test that negative modifiers below the limit are clamped to -1
+    /// for hit and wound rolls (per AoS rules).
+    #[test]
+    fn apply_modifier_below_limit() {
+        // Modifier of -10 should be clamped to -1 for hit rolls
+        let m = RollModifier::new(-10, 0, 0);
+        assert_eq!(m.apply_to_hit_modifier(5), 4);
+
+        // Modifier of -10 should be clamped to -1 for wound rolls
+        let m = RollModifier::new(0, -10, 0);
+        assert_eq!(m.apply_to_wound_modifier(5), 4);
+    }
+
+    /// Test that save modifiers can be very negative (rend effect).
+    #[test]
+    fn apply_to_save_large_negative() {
+        // Save modifiers don't have a lower limit, so -10 should work
+        let m = RollModifier::new(0, 0, -10);
+        // A save of 11 with -10 modifier becomes 1 (11-10=1)
+        assert_eq!(m.apply_to_save_modifier(11), 1);
+    }
+
+    /// Test boundary case where positive modifier is exactly at the +1 limit.
+    #[test]
+    fn apply_modifier_exactly_at_positive_limit() {
+        // Modifier of exactly +1 should work without clamping
+        let m = RollModifier::new(1, 0, 0);
+        assert_eq!(m.apply_to_hit_modifier(4), 5);
+
+        let m = RollModifier::new(0, 1, 0);
+        assert_eq!(m.apply_to_wound_modifier(4), 5);
+
+        // Save modifier of +1 should also work
+        let m = RollModifier::new(0, 0, 1);
+        assert_eq!(m.apply_to_save_modifier(4), 5);
+    }
+
+    /// Test boundary case where negative modifier is exactly at the -1 limit.
+    #[test]
+    fn apply_modifier_exactly_at_negative_limit() {
+        // Modifier of exactly -1 should work without clamping
+        let m = RollModifier::new(-1, 0, 0);
+        assert_eq!(m.apply_to_hit_modifier(4), 3);
+
+        let m = RollModifier::new(0, -1, 0);
+        assert_eq!(m.apply_to_wound_modifier(4), 3);
     }
 }
