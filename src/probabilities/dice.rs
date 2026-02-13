@@ -131,42 +131,50 @@ impl fmt::Display for DiceRollParseError {
 mod tests {
     use super::*;
 
+    /// Parsing "D6" should produce a single D6 variant.
     #[test]
     fn parse_d6() {
         let roll = DiceRoll::from_str("D6".to_string()).unwrap();
         assert!(matches!(roll, DiceRoll::D6));
     }
 
+    /// Parsing "D3" should produce a single D3 variant.
     #[test]
     fn parse_d3() {
         let roll = DiceRoll::from_str("D3".to_string()).unwrap();
         assert!(matches!(roll, DiceRoll::D3));
     }
 
+    /// Parsing "2D6" should produce ND6(2) — two six-sided dice.
     #[test]
     fn parse_2d6() {
         let roll = DiceRoll::from_str("2D6".to_string()).unwrap();
         assert!(matches!(roll, DiceRoll::ND6(2)));
     }
 
+    /// Parsing "D6+1" should produce D6Plus(1) — one D6 with a +1 bonus.
     #[test]
     fn parse_d6_plus_1() {
         let roll = DiceRoll::from_str("D6+1".to_string()).unwrap();
         assert!(matches!(roll, DiceRoll::D6Plus(1)));
     }
 
+    /// Parsing "2D3+1" should produce ND3Plus(2, 1) — two D3 with a +1 bonus.
     #[test]
     fn parse_2d3_plus_1() {
         let roll = DiceRoll::from_str("2D3+1".to_string()).unwrap();
         assert!(matches!(roll, DiceRoll::ND3Plus(2, 1)));
     }
 
+    /// An unrecognized string like "invalid" should return an error.
     #[test]
     fn parse_invalid() {
         let result = DiceRoll::from_str("invalid".to_string());
         assert!(result.is_err());
     }
 
+    /// A D6 should yield exactly 6 outcomes, each with probability 1/6,
+    /// and the total probability should sum to 1.
     #[test]
     fn d6_probabilities() {
         let roll = DiceRoll::D6;
@@ -179,6 +187,7 @@ mod tests {
         assert!((total - 1.0).abs() < 1e-10);
     }
 
+    /// A D3 should yield exactly 3 outcomes whose probabilities sum to 1.
     #[test]
     fn d3_probabilities() {
         let roll = DiceRoll::D3;
@@ -188,6 +197,8 @@ mod tests {
         assert!((total - 1.0).abs() < 1e-10);
     }
 
+    /// 2D6 should only produce sums in the range [2, 12],
+    /// and the total probability should sum to 1.
     #[test]
     fn nd6_sum_range() {
         let roll = DiceRoll::ND6(2);

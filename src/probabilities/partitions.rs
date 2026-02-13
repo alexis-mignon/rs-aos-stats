@@ -68,13 +68,14 @@ pub fn generate_partitions_probabilities(
 mod tests {
     use super::*;
 
+    /// Distributing 2 elements into 3 bins should produce C(2+3-1, 3-1) = 6 partitions.
     #[test]
     fn partition_count() {
         let partitions = generate_partitions(3, 2);
-        // C(n+k-1, k-1) = C(4,2) = 6
         assert_eq!(partitions.len(), 6);
     }
 
+    /// Every partition of 4 elements into 3 bins must have its parts sum to 4.
     #[test]
     fn partition_sums() {
         let partitions = generate_partitions(3, 4);
@@ -84,6 +85,8 @@ mod tests {
         }
     }
 
+    /// The multinomial probabilities over all partitions must sum to 1,
+    /// ensuring the probability distribution is valid.
     #[test]
     fn probabilities_sum_to_one() {
         let probas = vec![0.5, 0.3, 0.2];

@@ -186,32 +186,38 @@ mod tests {
     use super::*;
     use crate::probabilities::dice::DiceRoll;
 
+    /// A positive to_hit modifier of +1 should increase the roll value by 1.
     #[test]
     fn apply_to_hit_positive_modifier() {
         let m = RollModifier::new(1, 0, 0);
         assert_eq!(m.apply_to_hit_modifier(3), 4);
     }
 
+    /// A negative to_hit modifier of -1 should decrease the roll value by 1.
     #[test]
     fn apply_to_hit_negative_modifier() {
         let m = RollModifier::new(-1, 0, 0);
         assert_eq!(m.apply_to_hit_modifier(3), 2);
     }
 
+    /// Hit/wound modifiers are clamped to [-1, +1] per AoS rules,
+    /// so a +3 modifier should behave the same as +1.
     #[test]
     fn apply_to_hit_clamped_modifier() {
-        // Modifier of +3 is clamped to +1
         let m = RollModifier::new(3, 0, 0);
         assert_eq!(m.apply_to_hit_modifier(3), 4);
     }
 
+    /// Regression test for the bug where apply_to_save_modifier read
+    /// self.to_wound instead of self.to_save. With to_wound=5 and
+    /// to_save=-1, the result must reflect the to_save field.
     #[test]
     fn apply_to_save_modifier_uses_save_field() {
         let m = RollModifier::new(0, 5, -1);
-        // Should use to_save (-1), not to_wound (5)
         assert_eq!(m.apply_to_save_modifier(4), 3);
     }
 
+    /// The Add trait should combine two RollModifiers field-by-field.
     #[test]
     fn roll_modifier_add() {
         let a = RollModifier::new(1, 2, 3);
@@ -222,6 +228,7 @@ mod tests {
         assert_eq!(c.to_save, 0);
     }
 
+    /// The AddAssign trait (+=) should accumulate modifiers in place.
     #[test]
     fn roll_modifier_add_assign() {
         let mut a = RollModifier::new(1, 0, 0);
@@ -231,6 +238,7 @@ mod tests {
         assert_eq!(a.to_save, 1);
     }
 
+    /// A fixed Characteristic should return a single outcome with probability 1.
     #[test]
     fn characteristic_fixed_value() {
         let c = Characteristic::Value(3);
@@ -238,6 +246,8 @@ mod tests {
         assert_eq!(vp, vec![(3, 1.0)]);
     }
 
+    /// A dice-roll Characteristic (D6) should return 6 outcomes
+    /// whose probabilities sum to 1.
     #[test]
     fn characteristic_dice_roll() {
         let c = Characteristic::DiceRoll(DiceRoll::D6);

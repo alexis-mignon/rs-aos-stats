@@ -346,6 +346,7 @@ mod tests {
     use crate::probabilities::combat_stats::{AttackStats, DefenseStats};
     use crate::probabilities::combat_tree::compute_damages;
 
+    /// Helper: build a CombatConfig with fixed-value attacks and damages.
     fn make_config(attacks: u32, to_hit: u32, to_wound: u32, rend: u32, damages: u32, to_save: u32, ward: Option<u32>) -> CombatConfig {
         CombatConfig::new(
             AttackStats::new(
@@ -357,10 +358,12 @@ mod tests {
         )
     }
 
+    /// Helper: sum all probabilities in a damage distribution.
     fn proba_sum(results: &[(u32, f64)]) -> f64 {
         results.iter().map(|(_, p)| p).sum()
     }
 
+    /// Helper: the standard combat sequence (attacks → hit → wound → save → damages).
     fn standard_sequence() -> Vec<Box<dyn Rule>> {
         vec![
             Box::new(AttackCharacteristicRule),
@@ -371,34 +374,37 @@ mod tests {
         ]
     }
 
+    /// End-to-end test with a simple profile: 1 attack, 2+ hit, 2+ wound,
+    /// no save, 1 damage. Verifies the exact P(1 damage) = 25/36
+    /// (5/6 hit chance including crits * 5/6 wound chance).
     #[test]
     fn simple_fixed_attack() {
-        // 1 attack, 2+ hit, 2+ wound, no save (7+), 1 damage
         let config = make_config(1, 2, 2, 0, 1, 7, None);
         let results = compute_damages(config, &standard_sequence());
         let total = proba_sum(&results);
         assert!((total - 1.0).abs() < 1e-10);
-        // With 2+ to hit (5/6 considering crit) and 2+ to wound (5/6), P(1 damage) = 25/36
         let p1 = results.iter().find(|(d, _)| *d == 1).map(|(_, p)| *p).unwrap_or(0.0);
         assert!((p1 - 25.0 / 36.0).abs() < 1e-10);
     }
 
+    /// When both to_hit and to_wound thresholds are impossible (7+),
+    /// all probability must land on 0 damage. Note that crits (6) still
+    /// hit, but the wound roll at 7+ blocks all damage.
     #[test]
     fn all_miss() {
-        // to_hit = 7 and to_wound = 7: no damage possible
         let config = make_config(1, 7, 7, 0, 1, 7, None);
         let results = compute_damages(config, &standard_sequence());
-        // All probability should be on damage = 0
         let p0: f64 = results.iter().filter(|(d, _)| *d == 0).map(|(_, p)| *p).sum();
         assert!((p0 - 1.0).abs() < 1e-10);
-        // No non-zero damage entries
         let non_zero: f64 = results.iter().filter(|(d, _)| *d > 0).map(|(_, p)| *p).sum();
         assert!(non_zero.abs() < 1e-10);
     }
 
+    /// CritDoubleHitRule: critical rolls of 6 count as two hits instead of
+    /// one. With 3 attacks and 2 damage each, the theoretical maximum is
+    /// 3 crits * 2 hits * 2 damage = 12.
     #[test]
     fn crit_double_hit_max_damage() {
-        // 3 attacks, 4+ hit, 4+ wound, no save, 2 damage, crit double hit
         let config = make_config(3, 4, 4, 0, 2, 7, None);
         let sequence: Vec<Box<dyn Rule>> = vec![
             Box::new(AttackCharacteristicRule),
@@ -410,14 +416,15 @@ mod tests {
         let results = compute_damages(config, &sequence);
         let total = proba_sum(&results);
         assert!((total - 1.0).abs() < 1e-10);
-        // Max damage: all 3 crits = 6 hits, all wound = 6 wounds * 2 damage = 12
         let max_damage = results.iter().map(|(d, _)| *d).max().unwrap();
         assert_eq!(max_damage, 12);
     }
 
+    /// CritAutoWoundRule: crits bypass the wound roll entirely. With
+    /// to_wound=7 (impossible), only crits (1/6) can deal damage, so
+    /// P(1 damage) = 1/6.
     #[test]
     fn crit_auto_wound() {
-        // 1 attack, 4+ hit, 7 wound (impossible without crit auto-wound)
         let config = make_config(1, 4, 7, 0, 1, 7, None);
         let sequence: Vec<Box<dyn Rule>> = vec![
             Box::new(AttackCharacteristicRule),
@@ -427,14 +434,15 @@ mod tests {
             Box::new(DamagesRule),
         ];
         let results = compute_damages(config, &sequence);
-        // Only crits (1/6) auto-wound, everything else misses wound roll
         let p1 = results.iter().find(|(d, _)| *d == 1).map(|(_, p)| *p).unwrap_or(0.0);
         assert!((p1 - 1.0 / 6.0).abs() < 1e-10);
     }
 
+    /// CritMortalWoundRule: crits generate mortal wounds instead of normal
+    /// hits. With 1 attack and 1 damage, the max damage is still 1
+    /// (either via mortal wound from a crit, or via a normal wound).
     #[test]
     fn crit_mortal_wound() {
-        // 1 attack, 4+ hit, 4+ wound, no save, 1 damage
         let config = make_config(1, 4, 4, 0, 1, 7, None);
         let sequence: Vec<Box<dyn Rule>> = vec![
             Box::new(AttackCharacteristicRule),
@@ -446,26 +454,27 @@ mod tests {
         let results = compute_damages(config, &sequence);
         let total = proba_sum(&results);
         assert!((total - 1.0).abs() < 1e-10);
-        // Crits (1/6) generate mortal wounds instead of hits
-        // Max damage should be 1 (mortal wound from crit, or wound from normal hit)
         let max_damage = results.iter().map(|(d, _)| *d).max().unwrap();
         assert_eq!(max_damage, 1);
     }
 
+    /// A 4+ ward save should halve the probability of taking damage.
+    /// With P(wound) = 25/36 and a 4+ ward (50% chance to negate),
+    /// P(1 damage) = 25/72.
     #[test]
     fn ward_save_reduces_damage() {
-        // 1 attack, 2+ hit, 2+ wound, no armor save, 1 damage, 4+ ward
         let config = make_config(1, 2, 2, 0, 1, 7, Some(4));
         let mut sequence = standard_sequence();
         sequence.push(Box::new(WardRule));
         let results = compute_damages(config, &sequence);
         let total = proba_sum(&results);
         assert!((total - 1.0).abs() < 1e-10);
-        // P(hit)*P(wound) = 25/36, then ward saves half => P(1 damage) = 25/72
         let p1 = results.iter().find(|(d, _)| *d == 1).map(|(_, p)| *p).unwrap_or(0.0);
         assert!((p1 - 25.0 / 72.0).abs() < 1e-10);
     }
 
+    /// Sanity check on a more complex profile (3 attacks, 3+ hit, 4+ wound,
+    /// rend 1, 2 damage, 4+ save, 6+ ward): probabilities must sum to 1.
     #[test]
     fn probabilities_always_sum_to_one() {
         let config = make_config(3, 3, 4, 1, 2, 4, Some(6));
