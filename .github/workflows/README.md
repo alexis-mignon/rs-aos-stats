@@ -29,8 +29,9 @@ Déploie automatiquement la démo WASM sur GitHub Pages à chaque push sur `main
 Crée des releases automatiques lors de la création d'un tag (ex: `v0.1.0`).
 
 **Jobs :**
-- Build des wheels Python pour Linux, macOS, Windows
+- Build des wheels Python pour Linux, macOS, Windows (Python 3.9-3.12)
 - Build de l'archive WASM
+- Création automatique de la release GitHub avec tous les assets
 - Publication optionnelle sur PyPI
 
 **Configuration nécessaire pour PyPI :**
@@ -47,6 +48,11 @@ Crée des releases automatiques lors de la création d'un tag (ex: `v0.1.0`).
 git tag v0.1.0
 git push origin v0.1.0
 ```
+
+La release sera créée automatiquement avec :
+- Notes de version auto-générées
+- Wheels Python pour toutes les plateformes
+- Archive WASM complète
 
 ## 🔧 Badge de statut
 
