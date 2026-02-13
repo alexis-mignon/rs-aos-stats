@@ -12,7 +12,7 @@ use crate::python::rules::register_rules;
 use pyo3::prelude::*;
 
 #[pymodule]
-fn rs_aos_stats(_py: Python, m: &PyModule) -> PyResult<()> {
+fn rs_aos_stats(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<DiceRollPy>()?; // Now it's called DiceRoll in Python
     m.add_class::<D6>()?;
     m.add_class::<D3>()?;
