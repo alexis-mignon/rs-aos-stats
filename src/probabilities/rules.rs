@@ -27,7 +27,7 @@ impl Rule for AttackCharacteristicRule {
 pub trait TestRollRule : Rule {
     fn roll_count(&self, status: &CombatStatus) -> u32;
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64>;
-    fn build_node(&self, node: &CombatNode, counts: &Vec<u32>, probability: f64) -> CombatNode;
+    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode;
 
     fn apply(
         &self,
@@ -64,8 +64,8 @@ pub trait BaseHitRule : TestRollRule {
         vec![1.0 / 6.0, success_proba, 1.0 - success_proba - critical_proba ]
     }
 
-    fn result(&self, partition: &Vec<u32>) -> (u32, u32, u32);
-    fn build_node(&self, node: &CombatNode, counts: &Vec<u32>, probability: f64) -> CombatNode {
+    fn result(&self, partition: &[u32]) -> (u32, u32, u32);
+    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
         let (hits, wounds, mortal_wounds) = self.result(counts);
         CombatNode::new(
             node.status
@@ -83,7 +83,7 @@ pub trait BaseHitRule : TestRollRule {
 pub struct HitRule;
 
 impl BaseHitRule for HitRule {
-    fn result(&self, partition: &Vec<u32>) -> (u32, u32, u32) {
+    fn result(&self, partition: &[u32]) -> (u32, u32, u32) {
         (partition[0] + partition[1], 0, 0)
     }
 }
@@ -95,7 +95,7 @@ impl TestRollRule for HitRule {
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
         BaseHitRule::partition_prior(self, config)
     }
-    fn build_node(&self, node: &CombatNode, counts: &Vec<u32>, probability: f64) -> CombatNode {
+    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
         BaseHitRule::build_node(self, node, counts, probability)
     }
 
@@ -125,7 +125,7 @@ impl TestRollRule for WoundRule {
         vec![success_proba, 1.0 - success_proba]
 
     }
-    fn build_node(&self, node: &CombatNode, counts: &Vec<u32>, probability: f64) -> CombatNode {
+    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
         CombatNode::new(
             node.status
                 .with_hits(0)
@@ -160,7 +160,7 @@ impl TestRollRule for SaveRule {
         vec![success_proba, 1.0 - success_proba]
 
     }
-    fn build_node(&self, node: &CombatNode, counts: &Vec<u32>, probability: f64) -> CombatNode {
+    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
         CombatNode::new(
             node.status
                 .with_hits(0)
@@ -183,7 +183,7 @@ pub struct DamagesRule;
 impl DamagesRule {
     fn _random_damages(roll: DiceRoll, num_wounds: u32) -> Vec<(u32, f64)> {
         let rolls_probas = roll.values_and_probas();
-        let priors = rolls_probas.iter().map(|(_, proba)| *proba).collect();
+        let priors: Vec<f64> = rolls_probas.iter().map(|(_, proba)| *proba).collect();
         let roll_values: Vec<u32> = rolls_probas.iter().map(|(value, _)| *value).collect();
         let partitions = generate_partitions_probabilities(num_wounds, &priors);
         partitions.iter().map(
@@ -224,11 +224,12 @@ impl TestRollRule for WardRule {
     fn roll_count(&self, status: &CombatStatus) -> u32 {status.damages}
 
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
+        let ward_value = config.defense_stats.ward.expect("WardRule requires ward save to be set");
         let success_proba = (1..=6).map(
             |roll| {
                 match roll {
                     1 => 0.0,
-                    _ => (roll >= config.defense_stats.ward.unwrap()) as u32 as f64 / 6.0
+                    _ => (roll >= ward_value) as u32 as f64 / 6.0
                 }
             }
         ).sum();
@@ -237,7 +238,7 @@ impl TestRollRule for WardRule {
 
     }
 
-    fn build_node(&self, node: &CombatNode, counts: &Vec<u32>, probability: f64) -> CombatNode {
+    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
         CombatNode::new(
             node.status
                 .with_damages(node.status.damages - counts[0]),
@@ -250,7 +251,7 @@ impl TestRollRule for WardRule {
 
 impl Rule for WardRule {
     fn apply(&self, node: &CombatNode) -> Vec<CombatNode> {
-        if let Some(_) = node.config.defense_stats.ward {
+        if node.config.defense_stats.ward.is_some() {
             TestRollRule::apply(self, node)
         }
         else {
@@ -263,7 +264,7 @@ impl Rule for WardRule {
 pub struct CritMortalWoundRule;
 
 impl BaseHitRule for CritMortalWoundRule {
-    fn result(&self, partition: &Vec<u32>) -> (u32, u32, u32) {
+    fn result(&self, partition: &[u32]) -> (u32, u32, u32) {
         (partition[1], 0, partition[0])
     }
 }
@@ -275,7 +276,7 @@ impl TestRollRule for CritMortalWoundRule {
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
         BaseHitRule::partition_prior(self, config)
     }
-    fn build_node(&self, node: &CombatNode, counts: &Vec<u32>, probability: f64) -> CombatNode {
+    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
         BaseHitRule::build_node(self, node, counts, probability)
     }
 }
@@ -290,7 +291,7 @@ impl Rule for CritMortalWoundRule {
 pub struct CritAutoWoundRule;
 
 impl BaseHitRule for CritAutoWoundRule {
-    fn result(&self, partition: &Vec<u32>) -> (u32, u32, u32) {
+    fn result(&self, partition: &[u32]) -> (u32, u32, u32) {
         (partition[1], partition[0], 0)
     }
 }
@@ -302,7 +303,7 @@ impl TestRollRule for CritAutoWoundRule {
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
         BaseHitRule::partition_prior(self, config)
     }
-    fn build_node(&self, node: &CombatNode, counts: &Vec<u32>, probability: f64) -> CombatNode {
+    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
         BaseHitRule::build_node(self, node, counts, probability)
     }
 }
@@ -317,7 +318,7 @@ impl Rule for CritAutoWoundRule {
 pub struct CritDoubleHitRule;
 
 impl BaseHitRule for CritDoubleHitRule {
-    fn result(&self, partition: &Vec<u32>) -> (u32, u32, u32) {
+    fn result(&self, partition: &[u32]) -> (u32, u32, u32) {
         (2 * partition[0] + partition[1], 0, 0)
     }
 }
@@ -329,7 +330,7 @@ impl TestRollRule for CritDoubleHitRule {
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
         BaseHitRule::partition_prior(self, config)
     }
-    fn build_node(&self, node: &CombatNode, counts: &Vec<u32>, probability: f64) -> CombatNode {
+    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
         BaseHitRule::build_node(self, node, counts, probability)
     }
 }
@@ -483,5 +484,61 @@ mod tests {
         let results = compute_damages(config, &sequence);
         let total = proba_sum(&results);
         assert!((total - 1.0).abs() < 1e-10);
+    }
+
+    /// Test AttackCharacteristicRule with DiceRoll (D3) instead of fixed value.
+    /// With D3 attacks (1-3), we should get different possible damage outcomes.
+    #[test]
+    fn attack_characteristic_with_dice() {
+        let config = CombatConfig::new(
+            AttackStats::new(
+                Characteristic::DiceRoll(DiceRoll::D3),
+                2, 2, 0,
+                Characteristic::Value(1),
+            ),
+            DefenseStats::new(7, None),
+        );
+        let results = compute_damages(config, &standard_sequence());
+        let total = proba_sum(&results);
+        assert!((total - 1.0).abs() < 1e-10);
+        // With D3 attacks, max damage should be 3 (if all 3 attacks hit and wound)
+        let max_damage = results.iter().map(|(d, _)| *d).max().unwrap();
+        assert!(max_damage <= 3);
+    }
+
+    /// Test DamagesRule with DiceRoll (D3) instead of fixed damage value.
+    /// With 1 attack dealing D3 damage, outcomes should range from 0 to 3.
+    #[test]
+    fn damages_with_dice() {
+        let config = CombatConfig::new(
+            AttackStats::new(
+                Characteristic::Value(1),
+                2, 2, 0,
+                Characteristic::DiceRoll(DiceRoll::D3),
+            ),
+            DefenseStats::new(7, None),
+        );
+        let results = compute_damages(config, &standard_sequence());
+        let total = proba_sum(&results);
+        assert!((total - 1.0).abs() < 1e-10);
+        // With D3 damage, if the attack hits and wounds, damage should be 1-3
+        let has_positive_damage = results.iter().any(|(d, p)| *d > 0 && *p > 0.0);
+        assert!(has_positive_damage);
+    }
+
+    /// Test WardRule when no ward save is present. The rule should return
+    /// an empty vector when config.defense_stats.ward is None.
+    #[test]
+    fn ward_rule_no_ward() {
+        let config = make_config(1, 2, 2, 0, 1, 7, None);
+        let node = CombatNode::new(
+            CombatStatus::new_with_values(0, 0, 0, 0, 1),
+            config,
+            1.0,
+        );
+        let ward_rule = WardRule;
+        let result = Rule::apply(&ward_rule, &node);
+        // When no ward is present, WardRule should return an empty vector
+        assert_eq!(result.len(), 0);
     }
 }
