@@ -28,33 +28,39 @@ impl CombatStatus {
     }
 
     pub fn with_attacks(&self, attacks: u32) -> CombatStatus {
-        let mut new_status = self.clone();
+        let mut new_status = *self;
         new_status.attacks = attacks;
         new_status
     }
 
     pub fn with_hits(&self, hits: u32) -> CombatStatus {
-        let mut new_status = self.clone();
+        let mut new_status = *self;
         new_status.hits = hits;
         new_status
     }
 
     pub fn with_wounds(&self, wounds: u32) -> CombatStatus {
-        let mut new_status = self.clone();
+        let mut new_status = *self;
         new_status.wounds = wounds;
         new_status
     }
 
     pub fn with_mortal_wounds(&self, mortal_wounds: u32) -> CombatStatus {
-        let mut new_status = self.clone();
+        let mut new_status = *self;
         new_status.mortal_wounds = mortal_wounds;
         new_status
     }
 
     pub fn with_damages(&self, damages: u32) -> CombatStatus {
-        let mut new_status = self.clone();
+        let mut new_status = *self;
         new_status.damages = damages;
         new_status
+    }
+}
+
+impl Default for CombatStatus {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -71,8 +77,8 @@ impl CombatConfig {
         defense_stats: DefenseStats,
     ) -> CombatConfig {
         CombatConfig {
-            attack_stats: attack_stats,
-            defense_stats: defense_stats,
+            attack_stats,
+            defense_stats,
             modifier: RollModifier::new_null()
         }
     }
@@ -160,7 +166,7 @@ impl CombatTree {
         }
     }
 
-    pub fn build(&mut self, sequence: &Vec<Box<dyn Rule>>) -> () {
+    pub fn build(&mut self, sequence: &Vec<Box<dyn Rule>>) {
         for rule in sequence {
             let leaves = self.root.leaves_mut();
             for leaf in leaves {
@@ -194,4 +200,119 @@ pub fn compute_damages(config: CombatConfig, sequence: &Vec<Box<dyn Rule>>) -> V
     let mut tree = CombatTree::new(config);
     tree.build(sequence);
     tree.retrieve_damages_probas()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::probabilities::combat_stats::Characteristic;
+
+    /// Test CombatStatus::new creates a zero-initialized status.
+    #[test]
+    fn combat_status_new() {
+        let status = CombatStatus::new();
+        assert_eq!(status.attacks, 0);
+        assert_eq!(status.hits, 0);
+        assert_eq!(status.wounds, 0);
+        assert_eq!(status.mortal_wounds, 0);
+        assert_eq!(status.damages, 0);
+    }
+
+    /// Test CombatStatus::new_with_values sets all fields correctly.
+    #[test]
+    fn combat_status_new_with_values() {
+        let status = CombatStatus::new_with_values(5, 3, 2, 1, 4);
+        assert_eq!(status.attacks, 5);
+        assert_eq!(status.hits, 3);
+        assert_eq!(status.wounds, 2);
+        assert_eq!(status.mortal_wounds, 1);
+        assert_eq!(status.damages, 4);
+    }
+
+    /// Test all CombatStatus builder methods (with_*).
+    #[test]
+    fn combat_status_builder_methods() {
+        let status = CombatStatus::new();
+
+        // Test with_attacks
+        let modified = status.with_attacks(10);
+        assert_eq!(modified.attacks, 10);
+        assert_eq!(modified.hits, 0);
+
+        // Test with_hits
+        let modified = status.with_hits(5);
+        assert_eq!(modified.hits, 5);
+        assert_eq!(modified.attacks, 0);
+
+        // Test with_wounds
+        let modified = status.with_wounds(3);
+        assert_eq!(modified.wounds, 3);
+
+        // Test with_mortal_wounds
+        let modified = status.with_mortal_wounds(2);
+        assert_eq!(modified.mortal_wounds, 2);
+
+        // Test with_damages
+        let modified = status.with_damages(8);
+        assert_eq!(modified.damages, 8);
+    }
+
+    /// Test CombatConfig constructors.
+    #[test]
+    fn combat_config_constructors() {
+        let attack_stats = AttackStats::new(
+            Characteristic::Value(5),
+            3, 4, 1,
+            Characteristic::Value(2)
+        );
+        let defense_stats = DefenseStats::new(5, None);
+
+        // Test new (without modifiers)
+        let config = CombatConfig::new(attack_stats, defense_stats);
+        assert_eq!(config.modifier.to_hit, 0);
+        assert_eq!(config.modifier.to_wound, 0);
+        assert_eq!(config.modifier.to_save, 0);
+
+        // Test new_with_modifiers
+        let modifier = RollModifier::new(1, -1, 0);
+        let config = CombatConfig::new_with_modifiers(attack_stats, defense_stats, modifier);
+        assert_eq!(config.modifier.to_hit, 1);
+        assert_eq!(config.modifier.to_wound, -1);
+    }
+
+    /// Test CombatNode creation and child management.
+    #[test]
+    fn combat_node_children() {
+        let attack_stats = AttackStats::new(
+            Characteristic::Value(5),
+            3, 4, 1,
+            Characteristic::Value(2)
+        );
+        let defense_stats = DefenseStats::new(5, None);
+        let config = CombatConfig::new(attack_stats, defense_stats);
+
+        let mut node = CombatNode::new(CombatStatus::new(), config, 1.0);
+        assert_eq!(node.children.len(), 0);
+
+        // Add a child
+        let child = CombatNode::new(CombatStatus::new(), config, 0.5);
+        node.add_child(child);
+        assert_eq!(node.children.len(), 1);
+    }
+
+    /// Test leaves() returns the node itself when there are no children.
+    #[test]
+    fn combat_node_leaves_no_children() {
+        let attack_stats = AttackStats::new(
+            Characteristic::Value(5),
+            3, 4, 1,
+            Characteristic::Value(2)
+        );
+        let defense_stats = DefenseStats::new(5, None);
+        let config = CombatConfig::new(attack_stats, defense_stats);
+
+        let node = CombatNode::new(CombatStatus::new(), config, 1.0);
+        let leaves = node.leaves();
+        assert_eq!(leaves.len(), 1);
+    }
 }
