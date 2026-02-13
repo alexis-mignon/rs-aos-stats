@@ -7,7 +7,7 @@ use crate::probabilities::dice::DiceRoll;
 // Base class for all dice rolls
 
 fn _wrap_type<T: PyClass>(py: Python, obj: impl Into<PyClassInitializer<T>>) -> PyResult<PyObject> {
-    Ok(Py::new(py, obj).unwrap().to_object(py))
+    Ok(Py::new(py, obj)?.into_any())
 }
 
 #[pyclass(name="DiceRoll", subclass)]
@@ -27,7 +27,7 @@ impl DiceRollPy {
 
     #[staticmethod]
     fn from_str(py: Python, dice_str: String) -> PyResult<PyObject>{
-        let dice = DiceRoll::from_str(dice_str);
+        let dice = DiceRoll::from_str(&dice_str);
         match dice {
             Ok(DiceRoll::D3) => _wrap_type(py, D3::new()),
             Ok(DiceRoll::D6) => _wrap_type(py, D6::new()),
@@ -93,7 +93,7 @@ impl ND6 {
     }
 
     fn values_and_probas(&self) -> PyResult<Vec<(u32, f64)>> {
-        Ok(DiceRoll::ND3(self.n).values_and_probas())
+        Ok(DiceRoll::ND6(self.n).values_and_probas())
     }
 }
 
@@ -191,10 +191,10 @@ impl ND3Plus {
     }
 }
 
-impl TryFrom<&PyAny> for DiceRoll {
+impl TryFrom<&Bound<'_, PyAny>> for DiceRoll {
     type Error = PyErr;
 
-    fn try_from(value: &PyAny) -> Result<Self, Self::Error> {
+    fn try_from(value: &Bound<'_, PyAny>) -> Result<Self, Self::Error> {
         if let Ok(_d3) = value.extract::<D3>() {
             Ok(DiceRoll::D3)
         } else if let Ok(_d6) = value.extract::<D6>() {
@@ -213,10 +213,10 @@ impl TryFrom<&PyAny> for DiceRoll {
     }
 }
 
-impl TryFrom<PyAny> for DiceRoll {
+impl TryFrom<Bound<'_, PyAny>> for DiceRoll {
     type Error = PyErr;
 
-    fn try_from(value: PyAny) -> Result<Self, Self::Error> {
+    fn try_from(value: Bound<'_, PyAny>) -> Result<Self, Self::Error> {
         if let Ok(_d3) = value.extract::<D3>() {
             Ok(DiceRoll::D3)
         } else if let Ok(_d6) = value.extract::<D6>() {
@@ -234,5 +234,3 @@ impl TryFrom<PyAny> for DiceRoll {
         }
     }
 }
-
-
