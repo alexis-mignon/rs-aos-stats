@@ -97,13 +97,35 @@ make demo          # Tout en un
 
 ## Développement
 
+### Configuration des pre-commit hooks
+
+Pour assurer la qualité du code, installez les hooks de pre-commit qui exécuteront automatiquement les vérifications avant chaque commit:
+
+```bash
+# Installer pre-commit
+pip install pre-commit
+
+# Installer les hooks dans le repo
+pre-commit install
+
+# (Optionnel) Exécuter sur tous les fichiers
+pre-commit run --all-files
+```
+
+Les hooks configurés:
+- `cargo fmt` : Formatage du code Rust
+- `cargo clippy` : Linting du code Rust
+- `cargo test` : Exécution des tests
+- Vérifications générales : trailing whitespace, end-of-file, YAML, etc.
+
+### Commandes utiles
+
 ```bash
 # Tests
 cargo test
 
 # Tests Python
-cd examples
-python test_*.py
+pytest tests/ -v
 
 # Build Python
 maturin develop
