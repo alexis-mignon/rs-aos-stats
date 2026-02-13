@@ -1,9 +1,9 @@
-use wasm_bindgen::prelude::*;
-use crate::probabilities::combat_stats::{AttackStats, DefenseStats, Characteristic};
-use crate::probabilities::combat_tree::{CombatConfig, compute_damages, Rule};
-use crate::probabilities::rules::*;
+use crate::probabilities::combat_stats::{AttackStats, Characteristic, DefenseStats};
+use crate::probabilities::combat_tree::{compute_damages, CombatConfig, Rule};
 use crate::probabilities::dice::DiceRoll;
+use crate::probabilities::rules::*;
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct DamageProbability {
@@ -42,9 +42,7 @@ pub fn compute_combat_damage(
     let config = CombatConfig::new(attack_stats, defense_stats);
 
     // Build the rule sequence based on hit_rule_type
-    let mut sequence: Vec<Box<dyn Rule>> = vec![
-        Box::new(AttackCharacteristicRule),
-    ];
+    let mut sequence: Vec<Box<dyn Rule>> = vec![Box::new(AttackCharacteristicRule)];
 
     // Add the appropriate hit rule
     match hit_rule_type {
@@ -118,9 +116,7 @@ pub fn compute_combat_damage_with_dice_attacks(
     let defense_stats = DefenseStats::new(save, ward);
     let config = CombatConfig::new(attack_stats, defense_stats);
 
-    let mut sequence: Vec<Box<dyn Rule>> = vec![
-        Box::new(AttackCharacteristicRule),
-    ];
+    let mut sequence: Vec<Box<dyn Rule>> = vec![Box::new(AttackCharacteristicRule)];
 
     match hit_rule_type {
         "normal" => sequence.push(Box::new(HitRule)),

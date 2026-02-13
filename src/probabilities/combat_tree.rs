@@ -1,7 +1,6 @@
-use crate::probabilities::combat_stats::{AttackStats,DefenseStats, RollModifier};
+use crate::probabilities::combat_stats::{AttackStats, DefenseStats, RollModifier};
 use std::collections::HashMap;
 use std::fmt;
-
 
 #[derive(Clone, Copy, Debug)]
 pub struct CombatStatus {
@@ -23,8 +22,20 @@ impl CombatStatus {
         }
     }
 
-    pub fn new_with_values(attacks: u32, hits: u32, wounds: u32, mortal_wounds: u32, damages: u32) -> CombatStatus {
-        CombatStatus{attacks, hits, wounds, mortal_wounds, damages}
+    pub fn new_with_values(
+        attacks: u32,
+        hits: u32,
+        wounds: u32,
+        mortal_wounds: u32,
+        damages: u32,
+    ) -> CombatStatus {
+        CombatStatus {
+            attacks,
+            hits,
+            wounds,
+            mortal_wounds,
+            damages,
+        }
     }
 
     pub fn with_attacks(&self, attacks: u32) -> CombatStatus {
@@ -68,27 +79,28 @@ impl Default for CombatStatus {
 pub struct CombatConfig {
     pub attack_stats: AttackStats,
     pub defense_stats: DefenseStats,
-    pub modifier: RollModifier
+    pub modifier: RollModifier,
 }
 
 impl CombatConfig {
-    pub fn new(
-        attack_stats: AttackStats,
-        defense_stats: DefenseStats,
-    ) -> CombatConfig {
+    pub fn new(attack_stats: AttackStats, defense_stats: DefenseStats) -> CombatConfig {
         CombatConfig {
             attack_stats,
             defense_stats,
-            modifier: RollModifier::new_null()
+            modifier: RollModifier::new_null(),
         }
     }
 
     pub fn new_with_modifiers(
         attack_stats: AttackStats,
         defense_stats: DefenseStats,
-        modifier: RollModifier
+        modifier: RollModifier,
     ) -> CombatConfig {
-        CombatConfig {attack_stats, defense_stats, modifier}
+        CombatConfig {
+            attack_stats,
+            defense_stats,
+            modifier,
+        }
     }
 }
 
@@ -150,19 +162,14 @@ pub trait Rule: fmt::Debug {
     fn apply(&self, node: &CombatNode) -> Vec<CombatNode>;
 }
 
-
 pub struct CombatTree {
-    root: CombatNode
+    root: CombatNode,
 }
 
 impl CombatTree {
     pub fn new(config: CombatConfig) -> CombatTree {
         CombatTree {
-            root: CombatNode::new(
-                CombatStatus::new(),
-                config,
-                1.0
-            )
+            root: CombatNode::new(CombatStatus::new(), config, 1.0),
         }
     }
 
@@ -176,10 +183,12 @@ impl CombatTree {
     }
 
     pub fn retrieve_damages_probas(&self) -> Vec<(u32, f64)> {
-        let damages_probas: Vec<(u32, f64)> = self.root.leaves().iter().map(
-            |node| (node.status.damages, node.probability)
-        ).collect();
-
+        let damages_probas: Vec<(u32, f64)> = self
+            .root
+            .leaves()
+            .iter()
+            .map(|node| (node.status.damages, node.probability))
+            .collect();
 
         let mut damages_proba_grouped = HashMap::new();
         for (value, proba) in damages_probas {
@@ -188,13 +197,13 @@ impl CombatTree {
         }
 
         let mut damages_probas_vec: Vec<(u32, f64)> = damages_proba_grouped
-            .iter().map(|(value, proba)| (*value, *proba))
+            .iter()
+            .map(|(value, proba)| (*value, *proba))
             .collect();
         damages_probas_vec.sort_by(|a, b| a.0.cmp(&b.0));
         damages_probas_vec
     }
 }
-
 
 pub fn compute_damages(config: CombatConfig, sequence: &Vec<Box<dyn Rule>>) -> Vec<(u32, f64)> {
     let mut tree = CombatTree::new(config);
@@ -260,11 +269,8 @@ mod tests {
     /// Test CombatConfig constructors.
     #[test]
     fn combat_config_constructors() {
-        let attack_stats = AttackStats::new(
-            Characteristic::Value(5),
-            3, 4, 1,
-            Characteristic::Value(2)
-        );
+        let attack_stats =
+            AttackStats::new(Characteristic::Value(5), 3, 4, 1, Characteristic::Value(2));
         let defense_stats = DefenseStats::new(5, None);
 
         // Test new (without modifiers)
@@ -283,11 +289,8 @@ mod tests {
     /// Test CombatNode creation and child management.
     #[test]
     fn combat_node_children() {
-        let attack_stats = AttackStats::new(
-            Characteristic::Value(5),
-            3, 4, 1,
-            Characteristic::Value(2)
-        );
+        let attack_stats =
+            AttackStats::new(Characteristic::Value(5), 3, 4, 1, Characteristic::Value(2));
         let defense_stats = DefenseStats::new(5, None);
         let config = CombatConfig::new(attack_stats, defense_stats);
 
@@ -303,11 +306,8 @@ mod tests {
     /// Test leaves() returns the node itself when there are no children.
     #[test]
     fn combat_node_leaves_no_children() {
-        let attack_stats = AttackStats::new(
-            Characteristic::Value(5),
-            3, 4, 1,
-            Characteristic::Value(2)
-        );
+        let attack_stats =
+            AttackStats::new(Characteristic::Value(5), 3, 4, 1, Characteristic::Value(2));
         let defense_stats = DefenseStats::new(5, None);
         let config = CombatConfig::new(attack_stats, defense_stats);
 

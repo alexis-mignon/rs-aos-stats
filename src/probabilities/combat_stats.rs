@@ -1,5 +1,5 @@
-use std::ops::{Add, AddAssign};
 use crate::probabilities::dice::DiceRoll;
+use std::ops::{Add, AddAssign};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Characteristic {
@@ -48,7 +48,7 @@ impl AttackStats {
             to_hit: self.to_hit,
             to_wound: self.to_wound,
             rend: self.rend,
-            damages: self.damages
+            damages: self.damages,
         }
     }
 
@@ -58,8 +58,8 @@ impl AttackStats {
             to_hit: self.to_hit,
             to_wound: self.to_wound,
             rend: self.rend,
-            damages: value
-        }        
+            damages: value,
+        }
     }
 
     pub fn with_to_hit(&self, value: u32) -> AttackStats {
@@ -68,7 +68,7 @@ impl AttackStats {
             to_hit: value,
             to_wound: self.to_wound,
             rend: self.rend,
-            damages: self.damages
+            damages: self.damages,
         }
     }
 
@@ -78,7 +78,7 @@ impl AttackStats {
             to_hit: self.to_hit,
             to_wound: value,
             rend: self.rend,
-            damages: self.damages
+            damages: self.damages,
         }
     }
 
@@ -88,12 +88,10 @@ impl AttackStats {
             to_hit: self.to_hit,
             to_wound: self.to_wound,
             rend: value,
-            damages: self.damages
+            damages: self.damages,
         }
     }
-
 }
-
 
 #[derive(Clone, Copy, Debug)]
 pub struct DefenseStats {
@@ -107,15 +105,23 @@ impl DefenseStats {
     }
 
     pub fn with_to_save(&self, value: u32) -> DefenseStats {
-        DefenseStats {to_save: value, ward: self.ward}
+        DefenseStats {
+            to_save: value,
+            ward: self.ward,
+        }
     }
 
     pub fn with_ward(&self, value: u32) -> DefenseStats {
         if value > 0 {
-            DefenseStats {to_save: self.to_save, ward: Some(value)}
-        }
-        else {
-            DefenseStats {to_save: self.to_save, ward: None}
+            DefenseStats {
+                to_save: self.to_save,
+                ward: Some(value),
+            }
+        } else {
+            DefenseStats {
+                to_save: self.to_save,
+                ward: None,
+            }
         }
     }
 }
@@ -129,23 +135,31 @@ pub struct RollModifier {
 
 impl RollModifier {
     pub fn new(to_hit: i32, to_wound: i32, to_save: i32) -> RollModifier {
-        RollModifier {to_hit, to_wound, to_save}
+        RollModifier {
+            to_hit,
+            to_wound,
+            to_save,
+        }
     }
 
     pub fn new_null() -> RollModifier {
-        RollModifier {to_hit: 0, to_wound: 0, to_save: 0}
+        RollModifier {
+            to_hit: 0,
+            to_wound: 0,
+            to_save: 0,
+        }
     }
-    
+
     fn apply_modifier(value: u32, modifier: i32, limit_low: i32, limit_high: i32) -> u32 {
         let modifier = match modifier {
             v if v < limit_low => limit_low,
             v if v > limit_high => limit_high,
-            _ => modifier
+            _ => modifier,
         };
         let new_value = value as i32 + modifier;
         (match new_value {
             v if v < 0 => 0,
-            _ => new_value
+            _ => new_value,
         }) as u32
     }
 
@@ -165,7 +179,7 @@ impl RollModifier {
 impl Add for RollModifier {
     type Output = RollModifier;
     fn add(self, other: RollModifier) -> RollModifier {
-        RollModifier{
+        RollModifier {
             to_hit: self.to_hit + other.to_hit,
             to_wound: self.to_wound + other.to_wound,
             to_save: self.to_save + other.to_save,
@@ -261,11 +275,7 @@ mod tests {
     /// correctly modify individual fields while preserving others.
     #[test]
     fn attack_stats_with_methods() {
-        let stats = AttackStats::new(
-            Characteristic::Value(5),
-            3, 4, 1,
-            Characteristic::Value(2)
-        );
+        let stats = AttackStats::new(Characteristic::Value(5), 3, 4, 1, Characteristic::Value(2));
 
         // Test with_attacks
         let modified = stats.with_attacks(Characteristic::Value(10));

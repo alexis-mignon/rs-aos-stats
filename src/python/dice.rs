@@ -1,7 +1,7 @@
-use pyo3::exceptions::{PyValueError, PyNotImplementedError};
+use crate::probabilities::dice::DiceRoll;
+use pyo3::exceptions::{PyNotImplementedError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::PyClass;
-use crate::probabilities::dice::DiceRoll;
 
 //======================== Dice =========================
 // Base class for all dice rolls
@@ -10,23 +10,25 @@ fn _wrap_type<T: PyClass>(py: Python, obj: impl Into<PyClassInitializer<T>>) -> 
     Ok(Py::new(py, obj)?.into_any())
 }
 
-#[pyclass(name="DiceRoll", subclass)]
+#[pyclass(name = "DiceRoll", subclass)]
 pub struct DiceRollPy;
 
 #[pymethods]
 impl DiceRollPy {
     #[new]
     fn new() -> Self {
-       DiceRollPy
+        DiceRollPy
     }
 
     // Common interface for all variants
     fn values_and_probas(&self) -> PyResult<Vec<(u32, f64)>> {
-        Err(PyNotImplementedError::new_err("Not implemented for base class"))
+        Err(PyNotImplementedError::new_err(
+            "Not implemented for base class",
+        ))
     }
 
     #[staticmethod]
-    fn from_str(py: Python, dice_str: String) -> PyResult<PyObject>{
+    fn from_str(py: Python, dice_str: String) -> PyResult<PyObject> {
         let dice = DiceRoll::from_str(&dice_str);
         match dice {
             Ok(DiceRoll::D3) => _wrap_type(py, D3::new()),
@@ -37,7 +39,7 @@ impl DiceRollPy {
             Ok(DiceRoll::D6Plus(m)) => _wrap_type(py, D6Plus::new(m)),
             Ok(DiceRoll::ND3Plus(n, m)) => _wrap_type(py, ND3Plus::new(n, m)),
             Ok(DiceRoll::ND6Plus(n, m)) => _wrap_type(py, ND6Plus::new(n, m)),
-            Err(e) => Err(PyValueError::new_err(e.to_string()))
+            Err(e) => Err(PyValueError::new_err(e.to_string())),
         }
     }
 }
@@ -58,8 +60,6 @@ impl D6 {
         Ok(DiceRoll::D6.values_and_probas())
     }
 }
-
-
 
 // D3 class
 #[pyclass(extends=DiceRollPy)]
@@ -89,7 +89,7 @@ pub struct ND6 {
 impl ND6 {
     #[new]
     fn new(n: u32) -> (Self, DiceRollPy) {
-        (ND6 {n}, DiceRollPy)
+        (ND6 { n }, DiceRollPy)
     }
 
     fn values_and_probas(&self) -> PyResult<Vec<(u32, f64)>> {
@@ -97,19 +97,18 @@ impl ND6 {
     }
 }
 
-
 // ND3 class
 #[pyclass(extends=DiceRollPy)]
 #[derive(Clone, Copy, Debug)]
 pub struct ND3 {
-    n: u32
+    n: u32,
 }
 
 #[pymethods]
 impl ND3 {
     #[new]
     fn new(n: u32) -> (Self, DiceRollPy) {
-        (ND3 {n}, DiceRollPy)
+        (ND3 { n }, DiceRollPy)
     }
 
     fn values_and_probas(&self) -> PyResult<Vec<(u32, f64)>> {
@@ -120,14 +119,14 @@ impl ND3 {
 #[pyclass(extends=DiceRollPy)]
 #[derive(Clone, Copy, Debug)]
 pub struct D3Plus {
-    m: u32
+    m: u32,
 }
 
 #[pymethods]
 impl D3Plus {
     #[new]
     fn new(m: u32) -> (Self, DiceRollPy) {
-        (D3Plus {m}, DiceRollPy)
+        (D3Plus { m }, DiceRollPy)
     }
     fn values_and_probas(&self) -> PyResult<Vec<(u32, f64)>> {
         Ok(DiceRoll::D3Plus(self.m).values_and_probas())
@@ -137,34 +136,33 @@ impl D3Plus {
 #[pyclass(extends=DiceRollPy)]
 #[derive(Clone, Copy, Debug)]
 pub struct D6Plus {
-    m: u32
+    m: u32,
 }
 
 #[pymethods]
 impl D6Plus {
     #[new]
     fn new(m: u32) -> (Self, DiceRollPy) {
-        (D6Plus {m}, DiceRollPy)
+        (D6Plus { m }, DiceRollPy)
     }
     fn values_and_probas(&self) -> PyResult<Vec<(u32, f64)>> {
         Ok(DiceRoll::D6Plus(self.m).values_and_probas())
     }
 }
 
-
-
 // ND6plus class
 #[pyclass(extends=DiceRollPy)]
 #[derive(Clone, Copy, Debug)]
 pub struct ND6Plus {
-    n: u32, m: u32
+    n: u32,
+    m: u32,
 }
 
 #[pymethods]
 impl ND6Plus {
     #[new]
     fn new(n: u32, m: u32) -> (Self, DiceRollPy) {
-        (ND6Plus {n, m}, DiceRollPy)
+        (ND6Plus { n, m }, DiceRollPy)
     }
 
     fn values_and_probas(&self) -> PyResult<Vec<(u32, f64)>> {
@@ -176,14 +174,15 @@ impl ND6Plus {
 #[pyclass(extends=DiceRollPy)]
 #[derive(Clone, Copy, Debug)]
 pub struct ND3Plus {
-    n: u32, m: u32
+    n: u32,
+    m: u32,
 }
 
 #[pymethods]
 impl ND3Plus {
     #[new]
     fn new(n: u32, m: u32) -> (Self, DiceRollPy) {
-        (ND3Plus {n, m}, DiceRollPy)
+        (ND3Plus { n, m }, DiceRollPy)
     }
 
     fn values_and_probas(&self) -> PyResult<Vec<(u32, f64)>> {
@@ -208,7 +207,9 @@ impl TryFrom<&Bound<'_, PyAny>> for DiceRoll {
         } else if let Ok(nd6plus) = value.extract::<ND6Plus>() {
             Ok(DiceRoll::ND6Plus(nd6plus.n, nd6plus.m))
         } else {
-            Err(PyErr::new::<PyValueError, _>("Not implemented for this type"))
+            Err(PyErr::new::<PyValueError, _>(
+                "Not implemented for this type",
+            ))
         }
     }
 }
@@ -230,7 +231,9 @@ impl TryFrom<Bound<'_, PyAny>> for DiceRoll {
         } else if let Ok(nd6plus) = value.extract::<ND6Plus>() {
             Ok(DiceRoll::ND6Plus(nd6plus.n, nd6plus.m))
         } else {
-            Err(PyErr::new::<PyValueError, _>("Not implemented for this type"))
+            Err(PyErr::new::<PyValueError, _>(
+                "Not implemented for this type",
+            ))
         }
     }
 }

@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use regex::Regex;
+use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
 
@@ -87,12 +87,20 @@ impl FromStr for DiceRoll {
     type Err = DiceRollParseError;
 
     fn from_str(dice_str: &str) -> Result<DiceRoll, DiceRollParseError> {
-        let re = Regex::new(r"(?<n>\d+)?D(?<faces>[36])(\+(?<bonus>\d+))?").map_err(|_| DiceRollParseError::InvalidRegex)?;
+        let re = Regex::new(r"(?<n>\d+)?D(?<faces>[36])(\+(?<bonus>\d+))?")
+            .map_err(|_| DiceRollParseError::InvalidRegex)?;
 
         if let Some(captures) = re.captures(dice_str) {
-            let n = captures.name("n").map_or(1, |m| m.as_str().parse().unwrap());
-            let faces = captures.name("faces").map(|m| m.as_str().parse().unwrap()).unwrap();
-            let bonus = captures.name("bonus").map_or(0, |m| m.as_str().parse().unwrap());
+            let n = captures
+                .name("n")
+                .map_or(1, |m| m.as_str().parse().unwrap());
+            let faces = captures
+                .name("faces")
+                .map(|m| m.as_str().parse().unwrap())
+                .unwrap();
+            let bonus = captures
+                .name("bonus")
+                .map_or(0, |m| m.as_str().parse().unwrap());
 
             if n == 1 {
                 match faces {
@@ -129,7 +137,7 @@ impl FromStr for DiceRoll {
 pub enum DiceRollParseError {
     InvalidRegex,
     InvalidFaceNumber,
-    InvalidFormat
+    InvalidFormat,
 }
 
 impl fmt::Display for DiceRollParseError {
