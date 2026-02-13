@@ -126,3 +126,76 @@ impl fmt::Display for DiceRollParseError {
         write!(f, "{:?}", self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_d6() {
+        let roll = DiceRoll::from_str("D6".to_string()).unwrap();
+        assert!(matches!(roll, DiceRoll::D6));
+    }
+
+    #[test]
+    fn parse_d3() {
+        let roll = DiceRoll::from_str("D3".to_string()).unwrap();
+        assert!(matches!(roll, DiceRoll::D3));
+    }
+
+    #[test]
+    fn parse_2d6() {
+        let roll = DiceRoll::from_str("2D6".to_string()).unwrap();
+        assert!(matches!(roll, DiceRoll::ND6(2)));
+    }
+
+    #[test]
+    fn parse_d6_plus_1() {
+        let roll = DiceRoll::from_str("D6+1".to_string()).unwrap();
+        assert!(matches!(roll, DiceRoll::D6Plus(1)));
+    }
+
+    #[test]
+    fn parse_2d3_plus_1() {
+        let roll = DiceRoll::from_str("2D3+1".to_string()).unwrap();
+        assert!(matches!(roll, DiceRoll::ND3Plus(2, 1)));
+    }
+
+    #[test]
+    fn parse_invalid() {
+        let result = DiceRoll::from_str("invalid".to_string());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn d6_probabilities() {
+        let roll = DiceRoll::D6;
+        let vp = roll.values_and_probas();
+        assert_eq!(vp.len(), 6);
+        for (_, p) in &vp {
+            assert!((*p - 1.0 / 6.0).abs() < 1e-10);
+        }
+        let total: f64 = vp.iter().map(|(_, p)| p).sum();
+        assert!((total - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn d3_probabilities() {
+        let roll = DiceRoll::D3;
+        let vp = roll.values_and_probas();
+        assert_eq!(vp.len(), 3);
+        let total: f64 = vp.iter().map(|(_, p)| p).sum();
+        assert!((total - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn nd6_sum_range() {
+        let roll = DiceRoll::ND6(2);
+        let vp = roll.values_and_probas();
+        for (v, _) in &vp {
+            assert!(*v >= 2 && *v <= 12);
+        }
+        let total: f64 = vp.iter().map(|(_, p)| p).sum();
+        assert!((total - 1.0).abs() < 1e-10);
+    }
+}

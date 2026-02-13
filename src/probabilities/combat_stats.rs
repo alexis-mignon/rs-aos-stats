@@ -1,4 +1,3 @@
-//use std::collections::HashMap;
 use std::ops::{Add, AddAssign};
 use crate::probabilities::dice::DiceRoll;
 
@@ -159,7 +158,7 @@ impl RollModifier {
     }
 
     pub fn apply_to_save_modifier(&self, value: u32) -> u32 {
-        RollModifier::apply_modifier(value, self.to_wound, i32::MIN, 1)
+        RollModifier::apply_modifier(value, self.to_save, i32::MIN, 1)
     }
 }
 
@@ -179,5 +178,72 @@ impl AddAssign for RollModifier {
         self.to_hit += other.to_hit;
         self.to_wound += other.to_wound;
         self.to_save += other.to_save
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::probabilities::dice::DiceRoll;
+
+    #[test]
+    fn apply_to_hit_positive_modifier() {
+        let m = RollModifier::new(1, 0, 0);
+        assert_eq!(m.apply_to_hit_modifier(3), 4);
+    }
+
+    #[test]
+    fn apply_to_hit_negative_modifier() {
+        let m = RollModifier::new(-1, 0, 0);
+        assert_eq!(m.apply_to_hit_modifier(3), 2);
+    }
+
+    #[test]
+    fn apply_to_hit_clamped_modifier() {
+        // Modifier of +3 is clamped to +1
+        let m = RollModifier::new(3, 0, 0);
+        assert_eq!(m.apply_to_hit_modifier(3), 4);
+    }
+
+    #[test]
+    fn apply_to_save_modifier_uses_save_field() {
+        let m = RollModifier::new(0, 5, -1);
+        // Should use to_save (-1), not to_wound (5)
+        assert_eq!(m.apply_to_save_modifier(4), 3);
+    }
+
+    #[test]
+    fn roll_modifier_add() {
+        let a = RollModifier::new(1, 2, 3);
+        let b = RollModifier::new(-1, -2, -3);
+        let c = a + b;
+        assert_eq!(c.to_hit, 0);
+        assert_eq!(c.to_wound, 0);
+        assert_eq!(c.to_save, 0);
+    }
+
+    #[test]
+    fn roll_modifier_add_assign() {
+        let mut a = RollModifier::new(1, 0, 0);
+        a += RollModifier::new(0, 1, 1);
+        assert_eq!(a.to_hit, 1);
+        assert_eq!(a.to_wound, 1);
+        assert_eq!(a.to_save, 1);
+    }
+
+    #[test]
+    fn characteristic_fixed_value() {
+        let c = Characteristic::Value(3);
+        let vp = c.values_and_probas();
+        assert_eq!(vp, vec![(3, 1.0)]);
+    }
+
+    #[test]
+    fn characteristic_dice_roll() {
+        let c = Characteristic::DiceRoll(DiceRoll::D6);
+        let vp = c.values_and_probas();
+        assert_eq!(vp.len(), 6);
+        let total: f64 = vp.iter().map(|(_, p)| p).sum();
+        assert!((total - 1.0).abs() < 1e-10);
     }
 }

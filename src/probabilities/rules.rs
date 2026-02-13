@@ -152,7 +152,7 @@ impl TestRollRule for SaveRule {
             |roll| {
                 match roll {
                     1 => 0.0,
-                    _ => (config.modifier.apply_to_wound_modifier(roll) >= config.defense_stats.to_save + config.attack_stats.rend) as u32 as f64 / 6.0
+                    _ => (config.modifier.apply_to_save_modifier(roll) >= config.defense_stats.to_save + config.attack_stats.rend) as u32 as f64 / 6.0
                 }
             }
         ).sum();
@@ -188,7 +188,7 @@ impl DamagesRule {
         let partitions = generate_partitions_probabilities(num_wounds, &priors);
         partitions.iter().map(
             |(counts, proba)| {
-                (roll_values.iter().zip(counts).map(|(value, count)| (value * count)).sum(), *proba)
+                (roll_values.iter().zip(counts).map(|(value, count)| value * count).sum(), *proba)
             }
         ).collect()
     }
@@ -197,12 +197,10 @@ impl DamagesRule {
 impl Rule for DamagesRule {
     fn apply(&self, node: &CombatNode) -> Vec<CombatNode> {
         let num_wounds = node.status.wounds + node.status.mortal_wounds;
-        //println!("{:?}", node.config.attack_stats);
         let damages_and_probas = match node.config.attack_stats.damages {
             Characteristic::Value(value) => vec![(value * num_wounds, 1.0)],
             Characteristic::DiceRoll(roll) => DamagesRule::_random_damages(roll, num_wounds)
         };
-        //println!("{:?}", damages_and_probas);
         damages_and_probas.iter().map(
             |(damages, proba)| {
                 CombatNode::new(
@@ -339,5 +337,142 @@ impl TestRollRule for CritDoubleHitRule {
 impl Rule for CritDoubleHitRule {
     fn apply(&self, node: &CombatNode) -> Vec<CombatNode> {
         TestRollRule::apply(self, node)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::probabilities::combat_stats::{AttackStats, DefenseStats};
+    use crate::probabilities::combat_tree::compute_damages;
+
+    fn make_config(attacks: u32, to_hit: u32, to_wound: u32, rend: u32, damages: u32, to_save: u32, ward: Option<u32>) -> CombatConfig {
+        CombatConfig::new(
+            AttackStats::new(
+                Characteristic::Value(attacks),
+                to_hit, to_wound, rend,
+                Characteristic::Value(damages),
+            ),
+            DefenseStats::new(to_save, ward),
+        )
+    }
+
+    fn proba_sum(results: &[(u32, f64)]) -> f64 {
+        results.iter().map(|(_, p)| p).sum()
+    }
+
+    fn standard_sequence() -> Vec<Box<dyn Rule>> {
+        vec![
+            Box::new(AttackCharacteristicRule),
+            Box::new(HitRule),
+            Box::new(WoundRule),
+            Box::new(SaveRule),
+            Box::new(DamagesRule),
+        ]
+    }
+
+    #[test]
+    fn simple_fixed_attack() {
+        // 1 attack, 2+ hit, 2+ wound, no save (7+), 1 damage
+        let config = make_config(1, 2, 2, 0, 1, 7, None);
+        let results = compute_damages(config, &standard_sequence());
+        let total = proba_sum(&results);
+        assert!((total - 1.0).abs() < 1e-10);
+        // With 2+ to hit (5/6 considering crit) and 2+ to wound (5/6), P(1 damage) = 25/36
+        let p1 = results.iter().find(|(d, _)| *d == 1).map(|(_, p)| *p).unwrap_or(0.0);
+        assert!((p1 - 25.0 / 36.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn all_miss() {
+        // to_hit = 7 and to_wound = 7: no damage possible
+        let config = make_config(1, 7, 7, 0, 1, 7, None);
+        let results = compute_damages(config, &standard_sequence());
+        // All probability should be on damage = 0
+        let p0: f64 = results.iter().filter(|(d, _)| *d == 0).map(|(_, p)| *p).sum();
+        assert!((p0 - 1.0).abs() < 1e-10);
+        // No non-zero damage entries
+        let non_zero: f64 = results.iter().filter(|(d, _)| *d > 0).map(|(_, p)| *p).sum();
+        assert!(non_zero.abs() < 1e-10);
+    }
+
+    #[test]
+    fn crit_double_hit_max_damage() {
+        // 3 attacks, 4+ hit, 4+ wound, no save, 2 damage, crit double hit
+        let config = make_config(3, 4, 4, 0, 2, 7, None);
+        let sequence: Vec<Box<dyn Rule>> = vec![
+            Box::new(AttackCharacteristicRule),
+            Box::new(CritDoubleHitRule),
+            Box::new(WoundRule),
+            Box::new(SaveRule),
+            Box::new(DamagesRule),
+        ];
+        let results = compute_damages(config, &sequence);
+        let total = proba_sum(&results);
+        assert!((total - 1.0).abs() < 1e-10);
+        // Max damage: all 3 crits = 6 hits, all wound = 6 wounds * 2 damage = 12
+        let max_damage = results.iter().map(|(d, _)| *d).max().unwrap();
+        assert_eq!(max_damage, 12);
+    }
+
+    #[test]
+    fn crit_auto_wound() {
+        // 1 attack, 4+ hit, 7 wound (impossible without crit auto-wound)
+        let config = make_config(1, 4, 7, 0, 1, 7, None);
+        let sequence: Vec<Box<dyn Rule>> = vec![
+            Box::new(AttackCharacteristicRule),
+            Box::new(CritAutoWoundRule),
+            Box::new(WoundRule),
+            Box::new(SaveRule),
+            Box::new(DamagesRule),
+        ];
+        let results = compute_damages(config, &sequence);
+        // Only crits (1/6) auto-wound, everything else misses wound roll
+        let p1 = results.iter().find(|(d, _)| *d == 1).map(|(_, p)| *p).unwrap_or(0.0);
+        assert!((p1 - 1.0 / 6.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn crit_mortal_wound() {
+        // 1 attack, 4+ hit, 4+ wound, no save, 1 damage
+        let config = make_config(1, 4, 4, 0, 1, 7, None);
+        let sequence: Vec<Box<dyn Rule>> = vec![
+            Box::new(AttackCharacteristicRule),
+            Box::new(CritMortalWoundRule),
+            Box::new(WoundRule),
+            Box::new(SaveRule),
+            Box::new(DamagesRule),
+        ];
+        let results = compute_damages(config, &sequence);
+        let total = proba_sum(&results);
+        assert!((total - 1.0).abs() < 1e-10);
+        // Crits (1/6) generate mortal wounds instead of hits
+        // Max damage should be 1 (mortal wound from crit, or wound from normal hit)
+        let max_damage = results.iter().map(|(d, _)| *d).max().unwrap();
+        assert_eq!(max_damage, 1);
+    }
+
+    #[test]
+    fn ward_save_reduces_damage() {
+        // 1 attack, 2+ hit, 2+ wound, no armor save, 1 damage, 4+ ward
+        let config = make_config(1, 2, 2, 0, 1, 7, Some(4));
+        let mut sequence = standard_sequence();
+        sequence.push(Box::new(WardRule));
+        let results = compute_damages(config, &sequence);
+        let total = proba_sum(&results);
+        assert!((total - 1.0).abs() < 1e-10);
+        // P(hit)*P(wound) = 25/36, then ward saves half => P(1 damage) = 25/72
+        let p1 = results.iter().find(|(d, _)| *d == 1).map(|(_, p)| *p).unwrap_or(0.0);
+        assert!((p1 - 25.0 / 72.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn probabilities_always_sum_to_one() {
+        let config = make_config(3, 3, 4, 1, 2, 4, Some(6));
+        let mut sequence = standard_sequence();
+        sequence.push(Box::new(WardRule));
+        let results = compute_damages(config, &sequence);
+        let total = proba_sum(&results);
+        assert!((total - 1.0).abs() < 1e-10);
     }
 }

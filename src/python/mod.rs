@@ -1,18 +1,19 @@
-mod dice;
 mod combat_stats;
 mod combat_tree;
+mod dice;
 mod rules;
 
+use crate::python::combat_stats::{
+    AttackStatsPy, CharacteristicPy, DefenseStatsPy, RollModifierPy,
+};
+use crate::python::combat_tree::{compute_damages_py, CombatConfigPy};
+use crate::python::dice::{DiceRollPy, ND3Plus, ND6Plus, D3, D6, ND3, ND6};
+use crate::python::rules::register_rules;
 use pyo3::prelude::*;
-use crate::python::dice::{DiceRollPy, D3, D6, ND3, ND6, ND3Plus, ND6Plus};
-use crate::python::combat_stats::{CharacteristicPy, AttackStatsPy, DefenseStatsPy, RollModifierPy};
-use crate::python::combat_tree::{CombatConfigPy, compute_damages_py};
-use crate::python::rules::{HitRulePy, WoundRulePy, SaveRulePy, DamagesRulePy, AttackCharacteristicRulePy};
-
 
 #[pymodule]
 fn rs_aos_stats(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<DiceRollPy>()?;  // Now it's called DiceRoll in Python
+    m.add_class::<DiceRollPy>()?; // Now it's called DiceRoll in Python
     m.add_class::<D6>()?;
     m.add_class::<D3>()?;
     m.add_class::<ND6>()?;
@@ -28,10 +29,6 @@ fn rs_aos_stats(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<CombatConfigPy>()?;
     m.add_function(wrap_pyfunction!(compute_damages_py, m)?)?;
     // Rules
-    m.add_class::<HitRulePy>()?;
-    m.add_class::<WoundRulePy>()?;
-    m.add_class::<SaveRulePy>()?;
-    m.add_class::<DamagesRulePy>()?;
-    m.add_class::<AttackCharacteristicRulePy>()?;
+    register_rules(_py, m)?;
     Ok(())
 }

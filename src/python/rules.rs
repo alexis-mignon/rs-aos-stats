@@ -1,20 +1,21 @@
-use pyo3::prelude::*;
 use crate::probabilities::rules::{
-    HitRule, WoundRule, SaveRule, DamagesRule, AttackCharacteristicRule,
-    WardRule, CritAutoWoundRule, CritMortalWoundRule, CritDoubleHitRule
+    AttackCharacteristicRule, CritAutoWoundRule, CritDoubleHitRule, CritMortalWoundRule,
+    DamagesRule, HitRule, SaveRule, WardRule, WoundRule,
 };
+use pyo3::prelude::*;
 
 use crate::probabilities::combat_tree::Rule;
 
-
-#[pyclass(name="HitRule")]
+#[pyclass(name = "HitRule")]
 #[derive(Clone, Debug)]
 pub struct HitRulePy;
 
 #[pymethods]
 impl HitRulePy {
     #[new]
-    fn new() -> Self {Self {}}
+    fn new() -> Self {
+        Self {}
+    }
 }
 
 impl Into<HitRule> for HitRulePy {
@@ -23,14 +24,16 @@ impl Into<HitRule> for HitRulePy {
     }
 }
 
-#[pyclass(name="WoundRule")]
+#[pyclass(name = "WoundRule")]
 #[derive(Clone, Debug)]
 pub struct WoundRulePy;
 
 #[pymethods]
 impl WoundRulePy {
     #[new]
-    fn new() -> Self {Self {}}
+    fn new() -> Self {
+        Self {}
+    }
 }
 
 impl Into<WoundRule> for WoundRulePy {
@@ -39,14 +42,16 @@ impl Into<WoundRule> for WoundRulePy {
     }
 }
 
-#[pyclass(name="SaveRule")]
+#[pyclass(name = "SaveRule")]
 #[derive(Clone, Debug)]
 pub struct SaveRulePy;
 
 #[pymethods]
 impl SaveRulePy {
     #[new]
-    fn new() -> Self {Self {}}
+    fn new() -> Self {
+        Self {}
+    }
 }
 
 impl Into<SaveRule> for SaveRulePy {
@@ -55,14 +60,16 @@ impl Into<SaveRule> for SaveRulePy {
     }
 }
 
-#[pyclass(name="DamagesRule")]
+#[pyclass(name = "DamagesRule")]
 #[derive(Clone, Debug)]
 pub struct DamagesRulePy;
 
 #[pymethods]
 impl DamagesRulePy {
     #[new]
-    fn new() -> Self {Self {}}
+    fn new() -> Self {
+        Self {}
+    }
 }
 
 impl Into<DamagesRule> for DamagesRulePy {
@@ -71,14 +78,16 @@ impl Into<DamagesRule> for DamagesRulePy {
     }
 }
 
-#[pyclass(name="AttackCharacteristicRule")]
+#[pyclass(name = "AttackCharacteristicRule")]
 #[derive(Clone, Debug)]
 pub struct AttackCharacteristicRulePy;
 
 #[pymethods]
 impl AttackCharacteristicRulePy {
     #[new]
-    fn new() -> Self {Self {}}
+    fn new() -> Self {
+        Self {}
+    }
 }
 
 impl Into<AttackCharacteristicRule> for AttackCharacteristicRulePy {
@@ -87,14 +96,16 @@ impl Into<AttackCharacteristicRule> for AttackCharacteristicRulePy {
     }
 }
 
-#[pyclass(name="WardRule")]
+#[pyclass(name = "WardRule")]
 #[derive(Clone, Debug)]
 pub struct WardRulePy;
 
 #[pymethods]
 impl WardRulePy {
     #[new]
-    fn new() -> Self {Self {}}
+    fn new() -> Self {
+        Self {}
+    }
 }
 
 impl Into<WardRule> for WardRulePy {
@@ -103,15 +114,16 @@ impl Into<WardRule> for WardRulePy {
     }
 }
 
-#[pyclass(name="CritAutoWoundRule")]
+#[pyclass(name = "CritAutoWoundRule")]
 #[derive(Clone, Debug)]
 pub struct CritAutoWoundRulePy;
-
 
 #[pymethods]
 impl CritAutoWoundRulePy {
     #[new]
-    fn new() -> Self {Self {}}
+    fn new() -> Self {
+        Self {}
+    }
 }
 
 impl Into<CritAutoWoundRule> for CritAutoWoundRulePy {
@@ -120,14 +132,16 @@ impl Into<CritAutoWoundRule> for CritAutoWoundRulePy {
     }
 }
 
-#[pyclass(name="CritMortalWoundRule")]
+#[pyclass(name = "CritMortalWoundRule")]
 #[derive(Clone, Debug)]
 pub struct CritMortalWoundRulePy;
 
 #[pymethods]
 impl CritMortalWoundRulePy {
     #[new]
-    fn new() -> Self {Self {}}
+    fn new() -> Self {
+        Self {}
+    }
 }
 
 impl Into<CritMortalWoundRule> for CritMortalWoundRulePy {
@@ -136,14 +150,16 @@ impl Into<CritMortalWoundRule> for CritMortalWoundRulePy {
     }
 }
 
-#[pyclass(name="CritDoubleHitRule")]
+#[pyclass(name = "CritDoubleHitRule")]
 #[derive(Clone, Debug)]
 pub struct CritDoubleHitRulePy;
 
 #[pymethods]
 impl CritDoubleHitRulePy {
     #[new]
-    fn new() -> Self {Self {}}
+    fn new() -> Self {
+        Self {}
+    }
 }
 
 impl Into<CritDoubleHitRule> for CritDoubleHitRulePy {
@@ -152,59 +168,59 @@ impl Into<CritDoubleHitRule> for CritDoubleHitRulePy {
     }
 }
 
-
 impl From<&PyAny> for Box<dyn Rule> {
     fn from(rule: &PyAny) -> Box<dyn Rule> {
         if let Ok(rule) = rule.extract::<HitRulePy>() {
             let rule: HitRule = rule.into();
             let rule: Box<dyn Rule> = Box::new(rule);
             rule
-        }
-        else if let Ok(rule) = rule.extract::<WoundRulePy>() {
+        } else if let Ok(rule) = rule.extract::<WoundRulePy>() {
             let rule: WoundRule = rule.into();
             let rule: Box<dyn Rule> = Box::new(rule);
             rule
-        }
-        else if let Ok(rule) = rule.extract::<SaveRulePy>() {
+        } else if let Ok(rule) = rule.extract::<SaveRulePy>() {
             let rule: SaveRule = rule.into();
             let rule: Box<dyn Rule> = Box::new(rule);
             rule
-        }
-        else if let Ok(rule) = rule.extract::<DamagesRulePy>() {
+        } else if let Ok(rule) = rule.extract::<DamagesRulePy>() {
             let rule: DamagesRule = rule.into();
             let rule: Box<dyn Rule> = Box::new(rule);
             rule
-        }
-        else if let Ok(rule) = rule.extract::<AttackCharacteristicRulePy>() {
+        } else if let Ok(rule) = rule.extract::<AttackCharacteristicRulePy>() {
             let rule: AttackCharacteristicRule = rule.into();
             let rule: Box<dyn Rule> = Box::new(rule);
             rule
-        }
-        else if let Ok(rule) = rule.extract::<WardRulePy>() {
+        } else if let Ok(rule) = rule.extract::<WardRulePy>() {
             let rule: WardRule = rule.into();
             let rule: Box<dyn Rule> = Box::new(rule);
             rule
-        }
-        else if let Ok(rule) = rule.extract::<CritAutoWoundRulePy>() {
+        } else if let Ok(rule) = rule.extract::<CritAutoWoundRulePy>() {
             let rule: CritAutoWoundRule = rule.into();
             let rule: Box<dyn Rule> = Box::new(rule);
             rule
-        }
-        else if let Ok(rule) = rule.extract::<CritMortalWoundRulePy>() {
+        } else if let Ok(rule) = rule.extract::<CritMortalWoundRulePy>() {
             let rule: CritMortalWoundRule = rule.into();
             let rule: Box<dyn Rule> = Box::new(rule);
             rule
-        }
-        else if let Ok(rule) = rule.extract::<CritDoubleHitRulePy>() {
+        } else if let Ok(rule) = rule.extract::<CritDoubleHitRulePy>() {
             let rule: CritDoubleHitRule = rule.into();
             let rule: Box<dyn Rule> = Box::new(rule);
             rule
-        }
-        else {
+        } else {
             panic!("Unknown rule type")
         }
     }
 }
 
-
-
+pub fn register_rules(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_class::<HitRulePy>()?;
+    m.add_class::<WoundRulePy>()?;
+    m.add_class::<SaveRulePy>()?;
+    m.add_class::<DamagesRulePy>()?;
+    m.add_class::<AttackCharacteristicRulePy>()?;
+    m.add_class::<WardRulePy>()?;
+    m.add_class::<CritAutoWoundRulePy>()?;
+    m.add_class::<CritMortalWoundRulePy>()?;
+    m.add_class::<CritDoubleHitRulePy>()?;
+    Ok(())
+}

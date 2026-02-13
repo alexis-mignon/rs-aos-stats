@@ -6,27 +6,6 @@ use crate::probabilities::dice::DiceRoll;
 
 
 
-/* impl TryFrom<PyAny> for Characteristic {
-    type Error = PyErr;
-
-    fn try_from(value: PyAny) -> Result<Self, Self::Error> {
-        if let Ok(char_val) = value.extract::<i32>() {Ok(Characteristic::Value(char_val as u32))}
-        else if let Ok(char_roll) = value.try_into() {Ok(Characteristic::DiceRoll(char_roll))}
-        else {Err(PyValueError::new_err("Could not convert to Characteritic"))}
-    }
-}
-
-impl TryFrom<&PyAny> for Characteristic {
-    type Error = PyErr;
-
-    fn try_from(value: &PyAny) -> Result<Self, Self::Error> {
-        if let Ok(char_val) = value.extract::<i32>() {Ok(Characteristic::Value(char_val as u32))}
-        else if let Ok(char_roll) = TryInto::try_into(value) {Ok(Characteristic::DiceRoll(char_roll))}
-        else {Err(PyValueError::new_err("Could not convert to Characteritic"))}
-    }
-}
- */
-
 #[pyclass(name="Characteristic")]
 #[derive(Clone, Copy, Debug)]
 pub struct CharacteristicPy {

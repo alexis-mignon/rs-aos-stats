@@ -49,7 +49,6 @@ pub fn generate_partitions_probabilities(
     let n_partitions = probabilities.len();
     let partitions = generate_partitions(n_partitions, n_elements);
     let mut partitions_probabilities = Vec::new();
-    //println!("probabilities: {:?}", probabilities);
     let multinomial = Multinomial::new(&probabilities, n_elements as u64).unwrap();
 
     for partition in partitions {
@@ -63,4 +62,33 @@ pub fn generate_partitions_probabilities(
         partitions_probabilities.push((partition, partition_probability));
     }
     partitions_probabilities
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn partition_count() {
+        let partitions = generate_partitions(3, 2);
+        // C(n+k-1, k-1) = C(4,2) = 6
+        assert_eq!(partitions.len(), 6);
+    }
+
+    #[test]
+    fn partition_sums() {
+        let partitions = generate_partitions(3, 4);
+        for p in &partitions {
+            let s: u32 = p.iter().sum();
+            assert_eq!(s, 4);
+        }
+    }
+
+    #[test]
+    fn probabilities_sum_to_one() {
+        let probas = vec![0.5, 0.3, 0.2];
+        let partitions = generate_partitions_probabilities(3, &probas);
+        let total: f64 = partitions.iter().map(|(_, p)| p).sum();
+        assert!((total - 1.0).abs() < 1e-10);
+    }
 }

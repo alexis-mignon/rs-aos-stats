@@ -56,25 +56,6 @@ impl CombatStatus {
         new_status.damages = damages;
         new_status
     }
-
-/*     pub fn with_attribute(&self, attribute: CombatStatusAttribute, value: u32) -> CombatStatus {
-        match attribute {
-            CombatStatusAttribute::Attacks => self.with_attacks(value),
-            CombatStatusAttribute::Hits => self.with_hits(value),
-            CombatStatusAttribute::Wounds => self.with_wounds(value),
-            CombatStatusAttribute::MortalWounds => self.with_mortal_wounds(value),
-            CombatStatusAttribute::Damages => self.with_damages(value)
-        }
-    } */
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum CombatStatusAttribute {
-    Attacks,
-    Hits,
-    Wounds,
-    MortalWounds,
-    Damages
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -183,7 +164,6 @@ impl CombatTree {
         for rule in sequence {
             let leaves = self.root.leaves_mut();
             for leaf in leaves {
-                //println!("{:?}: {:?}", rule, leaf.status);
                 leaf.apply_rule(rule.as_ref());
             }
         }
