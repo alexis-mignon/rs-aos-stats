@@ -139,4 +139,4 @@ jobs:
         run: pip install --find-links=dist rs-aos-stats
 
       - name: Run Python tests
-        run: cd examples && python -m pytest test_*.py -v
+        run: pytest tests/ -v

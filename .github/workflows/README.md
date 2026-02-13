@@ -76,7 +76,7 @@ Les workflows utilisent le cache GitHub Actions pour accélérer les builds :
 
 ## ⚠️  Notes importantes
 
-1. **Test Python** : Le job `test-python` nécessite que vos tests Python soient dans le dossier `examples/` avec le pattern `test_*.py`
+1. **Test Python** : Le job `test-python` exécute les tests Python du dossier `tests/` avec pytest
 
 2. **GitHub Pages** : Assurez-vous que GitHub Pages est activé dans les paramètres de votre repo
 
