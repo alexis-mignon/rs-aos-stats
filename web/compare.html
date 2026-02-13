@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AoS Stats - Comparison Mode</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .nav {
+            background: #f8f9fa;
+            padding: 10px 30px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .nav a {
+            color: #667eea;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.3s;
+        }
+
+        .nav a:hover {
+            background: #e9ecef;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .control-group h2 {
+            color: #667eea;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .input-row {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 5px;
+            background: #d3d3d3;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        .value-display {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            min-width: 35px;
+            text-align: center;
+            float: right;
+            font-size: 0.9em;
+        }
+
+        #chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            position: relative;
+            height: 600px;
+        }
+
+        canvas {
+            max-height: 550px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-left: 4px solid;
+            padding: 15px;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .stat-card.normal {
+            border-color: #667eea;
+        }
+
+        .stat-card.crit_auto_wound {
+            border-color: #f093fb;
+        }
+
+        .stat-card.crit_mortal_wound {
+            border-color: #ff6b6b;
+        }
+
+        .stat-card.crit_double_hit {
+            border-color: #51cf66;
+        }
+
+        .stat-card .label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .stat-card .value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .stat-card .sublabel {
+            font-size: 0.9em;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .error {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚔️ Age of Sigmar Damage Calculator</h1>
+            <p class="subtitle">Comparison Mode - Compare all hit rule types</p>
+        </header>
+
+        <div class="nav">
+            <a href="index.html">← Single Mode</a>
+        </div>
+
+        <div class="content">
+            <div class="controls">
+                <div class="control-group">
+                    <h2>Attack Stats</h2>
+                    <div class="input-row">
+                        <label>
+                            Attacks: <span class="value-display" id="attacks-value">10</span>
+                        </label>
+                        <input type="range" id="attacks" min="1" max="30" value="10">
+                    </div>
+                    <div class="input-row">
+                        <label>
+                            To Hit (X+): <span class="value-display" id="to-hit-value">3+</span>
+                        </label>
+                        <input type="range" id="to-hit" min="2" max="6" value="3">
+                    </div>
+                    <div class="input-row">
+                        <label>
+                            To Wound (X+): <span class="value-display" id="to-wound-value">3+</span>
+                        </label>
+                        <input type="range" id="to-wound" min="2" max="6" value="3">
+                    </div>
+                    <div class="input-row">
+                        <label>
+                            Rend: <span class="value-display" id="rend-value">1</span>
+                        </label>
+                        <input type="range" id="rend" min="0" max="5" value="1">
+                    </div>
+                    <div class="input-row">
+                        <label>
+                            Damage: <span class="value-display" id="damage-value">1</span>
+                        </label>
+                        <input type="range" id="damage" min="1" max="6" value="1">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h2>Defense Stats</h2>
+                    <div class="input-row">
+                        <label>
+                            Save (X+): <span class="value-display" id="save-value">4+</span>
+                        </label>
+                        <input type="range" id="save" min="2" max="6" value="4">
+                    </div>
+                    <div class="input-row">
+                        <label>
+                            Ward (X+): <span class="value-display" id="ward-value">None</span>
+                        </label>
+                        <input type="range" id="ward" min="2" max="7" value="7">
+                    </div>
+                </div>
+            </div>
+
+            <div class="error" id="error-message"></div>
+            <div class="loading" id="loading">Loading WASM module...</div>
+
+            <div class="stats-grid" id="stats-grid" style="display: none;"></div>
+
+            <div id="chart-container">
+                <canvas id="damage-chart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="./compare.js"></script>
+</body>
+</html>
