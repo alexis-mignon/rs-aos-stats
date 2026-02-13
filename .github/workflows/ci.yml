@@ -130,7 +130,7 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.python-version }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install maturin
-        run: pip install maturin pytest
+        run: pip install maturin pytest hypothesis
 
       - name: Build Python package
         run: maturin build --features python --out dist
