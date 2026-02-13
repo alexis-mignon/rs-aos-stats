@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use regex::Regex;
 use std::fmt;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy)]
 pub enum DiceRoll {
@@ -75,10 +76,20 @@ fn _generate_dice_rolls_recursive(
 }
 
 impl DiceRoll {
-    pub fn from_str(dice_str: String) -> Result<DiceRoll, DiceRollParseError> {
+    /// Parses a dice notation string. This is a convenience wrapper around the FromStr trait.
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(dice_str: &str) -> Result<DiceRoll, DiceRollParseError> {
+        dice_str.parse()
+    }
+}
+
+impl FromStr for DiceRoll {
+    type Err = DiceRollParseError;
+
+    fn from_str(dice_str: &str) -> Result<DiceRoll, DiceRollParseError> {
         let re = Regex::new(r"(?<n>\d+)?D(?<faces>[36])(\+(?<bonus>\d+))?").map_err(|_| DiceRollParseError::InvalidRegex)?;
-        
-        if let Some(captures) = re.captures(&dice_str) {
+
+        if let Some(captures) = re.captures(dice_str) {
             let n = captures.name("n").map_or(1, |m| m.as_str().parse().unwrap());
             let faces = captures.name("faces").map(|m| m.as_str().parse().unwrap()).unwrap();
             let bonus = captures.name("bonus").map_or(0, |m| m.as_str().parse().unwrap());
@@ -134,42 +145,42 @@ mod tests {
     /// Parsing "D6" should produce a single D6 variant.
     #[test]
     fn parse_d6() {
-        let roll = DiceRoll::from_str("D6".to_string()).unwrap();
+        let roll = DiceRoll::from_str("D6").unwrap();
         assert!(matches!(roll, DiceRoll::D6));
     }
 
     /// Parsing "D3" should produce a single D3 variant.
     #[test]
     fn parse_d3() {
-        let roll = DiceRoll::from_str("D3".to_string()).unwrap();
+        let roll = DiceRoll::from_str("D3").unwrap();
         assert!(matches!(roll, DiceRoll::D3));
     }
 
     /// Parsing "2D6" should produce ND6(2) — two six-sided dice.
     #[test]
     fn parse_2d6() {
-        let roll = DiceRoll::from_str("2D6".to_string()).unwrap();
+        let roll = DiceRoll::from_str("2D6").unwrap();
         assert!(matches!(roll, DiceRoll::ND6(2)));
     }
 
     /// Parsing "D6+1" should produce D6Plus(1) — one D6 with a +1 bonus.
     #[test]
     fn parse_d6_plus_1() {
-        let roll = DiceRoll::from_str("D6+1".to_string()).unwrap();
+        let roll = DiceRoll::from_str("D6+1").unwrap();
         assert!(matches!(roll, DiceRoll::D6Plus(1)));
     }
 
     /// Parsing "2D3+1" should produce ND3Plus(2, 1) — two D3 with a +1 bonus.
     #[test]
     fn parse_2d3_plus_1() {
-        let roll = DiceRoll::from_str("2D3+1".to_string()).unwrap();
+        let roll = DiceRoll::from_str("2D3+1").unwrap();
         assert!(matches!(roll, DiceRoll::ND3Plus(2, 1)));
     }
 
     /// An unrecognized string like "invalid" should return an error.
     #[test]
     fn parse_invalid() {
-        let result = DiceRoll::from_str("invalid".to_string());
+        let result = DiceRoll::from_str("invalid");
         assert!(result.is_err());
     }
 
@@ -208,5 +219,93 @@ mod tests {
         }
         let total: f64 = vp.iter().map(|(_, p)| p).sum();
         assert!((total - 1.0).abs() < 1e-10);
+    }
+
+    /// D3Plus should add a bonus to each D3 outcome,
+    /// producing values [1+bonus, 3+bonus].
+    #[test]
+    fn d3_plus_probabilities() {
+        let roll = DiceRoll::D3Plus(2);
+        let vp = roll.values_and_probas();
+        assert_eq!(vp.len(), 3);
+        // Should have values 3, 4, 5 (1+2, 2+2, 3+2)
+        assert!(vp.iter().any(|(v, _)| *v == 3));
+        assert!(vp.iter().any(|(v, _)| *v == 4));
+        assert!(vp.iter().any(|(v, _)| *v == 5));
+        let total: f64 = vp.iter().map(|(_, p)| p).sum();
+        assert!((total - 1.0).abs() < 1e-10);
+    }
+
+    /// D6Plus should add a bonus to each D6 outcome,
+    /// producing values [1+bonus, 6+bonus].
+    #[test]
+    fn d6_plus_probabilities() {
+        let roll = DiceRoll::D6Plus(1);
+        let vp = roll.values_and_probas();
+        assert_eq!(vp.len(), 6);
+        // Should have values 2-7
+        assert!(vp.iter().all(|(v, _)| *v >= 2 && *v <= 7));
+        let total: f64 = vp.iter().map(|(_, p)| p).sum();
+        assert!((total - 1.0).abs() < 1e-10);
+    }
+
+    /// ND3 should produce sums in the range [n, 3*n].
+    #[test]
+    fn nd3_probabilities() {
+        let roll = DiceRoll::ND3(2);
+        let vp = roll.values_and_probas();
+        // Range should be [2, 6]
+        assert!(vp.iter().all(|(v, _)| *v >= 2 && *v <= 6));
+        let total: f64 = vp.iter().map(|(_, p)| p).sum();
+        assert!((total - 1.0).abs() < 1e-10);
+    }
+
+    /// ND3Plus should produce sums in the range [n+bonus, 3*n+bonus].
+    #[test]
+    fn nd3_plus_probabilities() {
+        let roll = DiceRoll::ND3Plus(2, 1);
+        let vp = roll.values_and_probas();
+        // Range should be [3, 7] (2d3 gives 2-6, +1 = 3-7)
+        assert!(vp.iter().all(|(v, _)| *v >= 3 && *v <= 7));
+        let total: f64 = vp.iter().map(|(_, p)| p).sum();
+        assert!((total - 1.0).abs() < 1e-10);
+    }
+
+    /// ND6Plus should produce sums in the range [n+bonus, 6*n+bonus].
+    #[test]
+    fn nd6_plus_probabilities() {
+        let roll = DiceRoll::ND6Plus(2, 1);
+        let vp = roll.values_and_probas();
+        // Range should be [3, 13] (2d6 gives 2-12, +1 = 3-13)
+        assert!(vp.iter().all(|(v, _)| *v >= 3 && *v <= 13));
+        let total: f64 = vp.iter().map(|(_, p)| p).sum();
+        assert!((total - 1.0).abs() < 1e-10);
+    }
+
+    /// Parsing "2D6+3" should produce ND6Plus(2, 3).
+    #[test]
+    fn parse_2d6_plus_3() {
+        let roll = DiceRoll::from_str("2D6+3").unwrap();
+        assert!(matches!(roll, DiceRoll::ND6Plus(2, 3)));
+    }
+
+    /// Parsing "D3+2" should produce D3Plus(2).
+    #[test]
+    fn parse_d3_plus_2() {
+        let roll = DiceRoll::from_str("D3+2").unwrap();
+        assert!(matches!(roll, DiceRoll::D3Plus(2)));
+    }
+
+    /// The DiceRollParseError Display trait should produce
+    /// a readable error message.
+    #[test]
+    fn dice_roll_parse_error_display() {
+        let err = DiceRollParseError::InvalidFormat;
+        let display = format!("{}", err);
+        assert!(display.contains("InvalidFormat"));
+
+        let err = DiceRollParseError::InvalidFaceNumber;
+        let display = format!("{}", err);
+        assert!(display.contains("InvalidFaceNumber"));
     }
 }
