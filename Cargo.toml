@@ -9,6 +9,6 @@ name = "rs_aos_stats"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-pyo3 = { version = "0.23", features = ["extension-module"] }
+pyo3 = { version = "0.24.1", features = ["extension-module"] }
 regex = "1.10.6"
 statrs = "0.17.1"
