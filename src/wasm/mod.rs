@@ -18,34 +18,52 @@ pub struct CombatResult {
     pub max_damage: u32,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct CombatParams {
+    pub attacks: u32,
+    pub to_hit: u32,
+    pub to_wound: u32,
+    pub rend: u32,
+    pub damage: u32,
+    pub save: u32,
+    pub ward: Option<u32>,
+    pub hit_rule_type: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CombatParamsWithDice {
+    pub attacks_dice: String,
+    pub to_hit: u32,
+    pub to_wound: u32,
+    pub rend: u32,
+    pub damage: u32,
+    pub save: u32,
+    pub ward: Option<u32>,
+    pub hit_rule_type: String,
+}
+
 /// Compute damage probabilities for a given combat scenario
 #[wasm_bindgen]
-pub fn compute_combat_damage(
-    attacks: u32,
-    to_hit: u32,
-    to_wound: u32,
-    rend: u32,
-    damage: u32,
-    save: u32,
-    ward: Option<u32>,
-    hit_rule_type: &str,
-) -> Result<JsValue, JsValue> {
+pub fn compute_combat_damage(params: JsValue) -> Result<JsValue, JsValue> {
+    let params: CombatParams =
+        serde_wasm_bindgen::from_value(params).map_err(|e| JsValue::from_str(&e.to_string()))?;
+
     let attack_stats = AttackStats::new(
-        Characteristic::Value(attacks),
-        to_hit,
-        to_wound,
-        rend,
-        Characteristic::Value(damage),
+        Characteristic::Value(params.attacks),
+        params.to_hit,
+        params.to_wound,
+        params.rend,
+        Characteristic::Value(params.damage),
     );
 
-    let defense_stats = DefenseStats::new(save, ward);
+    let defense_stats = DefenseStats::new(params.save, params.ward);
     let config = CombatConfig::new(attack_stats, defense_stats);
 
     // Build the rule sequence based on hit_rule_type
     let mut sequence: Vec<Box<dyn Rule>> = vec![Box::new(AttackCharacteristicRule)];
 
     // Add the appropriate hit rule
-    match hit_rule_type {
+    match params.hit_rule_type.as_str() {
         "normal" => sequence.push(Box::new(HitRule)),
         "crit_auto_wound" => sequence.push(Box::new(CritAutoWoundRule)),
         "crit_mortal_wound" => sequence.push(Box::new(CritMortalWoundRule)),
@@ -59,7 +77,7 @@ pub fn compute_combat_damage(
     sequence.push(Box::new(DamagesRule));
 
     // Add ward rule if ward save exists
-    if ward.is_some() {
+    if params.ward.is_some() {
         sequence.push(Box::new(WardRule));
     }
 
@@ -89,17 +107,11 @@ pub fn compute_combat_damage(
 
 /// Compute damage probabilities with dice rolls for attacks
 #[wasm_bindgen]
-pub fn compute_combat_damage_with_dice_attacks(
-    attacks_dice: &str,
-    to_hit: u32,
-    to_wound: u32,
-    rend: u32,
-    damage: u32,
-    save: u32,
-    ward: Option<u32>,
-    hit_rule_type: &str,
-) -> Result<JsValue, JsValue> {
-    let dice_roll = match attacks_dice {
+pub fn compute_combat_damage_with_dice_attacks(params: JsValue) -> Result<JsValue, JsValue> {
+    let params: CombatParamsWithDice =
+        serde_wasm_bindgen::from_value(params).map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    let dice_roll = match params.attacks_dice.as_str() {
         "D3" => DiceRoll::D3,
         "D6" => DiceRoll::D6,
         _ => return Err(JsValue::from_str("Invalid dice type for attacks")),
@@ -107,18 +119,18 @@ pub fn compute_combat_damage_with_dice_attacks(
 
     let attack_stats = AttackStats::new(
         Characteristic::DiceRoll(dice_roll),
-        to_hit,
-        to_wound,
-        rend,
-        Characteristic::Value(damage),
+        params.to_hit,
+        params.to_wound,
+        params.rend,
+        Characteristic::Value(params.damage),
     );
 
-    let defense_stats = DefenseStats::new(save, ward);
+    let defense_stats = DefenseStats::new(params.save, params.ward);
     let config = CombatConfig::new(attack_stats, defense_stats);
 
     let mut sequence: Vec<Box<dyn Rule>> = vec![Box::new(AttackCharacteristicRule)];
 
-    match hit_rule_type {
+    match params.hit_rule_type.as_str() {
         "normal" => sequence.push(Box::new(HitRule)),
         "crit_auto_wound" => sequence.push(Box::new(CritAutoWoundRule)),
         "crit_mortal_wound" => sequence.push(Box::new(CritMortalWoundRule)),
@@ -130,7 +142,7 @@ pub fn compute_combat_damage_with_dice_attacks(
     sequence.push(Box::new(SaveRule));
     sequence.push(Box::new(DamagesRule));
 
-    if ward.is_some() {
+    if params.ward.is_some() {
         sequence.push(Box::new(WardRule));
     }
 

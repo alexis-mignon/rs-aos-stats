@@ -94,16 +94,16 @@ function updateCalculation() {
         const hitRule = document.getElementById('hit-rule').value;
 
         // Call WASM function
-        const result = compute_combat_damage(
+        const result = compute_combat_damage({
             attacks,
-            toHit,
-            toWound,
+            to_hit: toHit,
+            to_wound: toWound,
             rend,
             damage,
             save,
             ward,
-            hitRule
-        );
+            hit_rule_type: hitRule
+        });
 
         // Update statistics display
         document.getElementById('mean-damage').textContent = result.mean_damage.toFixed(2);

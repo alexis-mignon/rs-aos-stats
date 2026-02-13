@@ -67,9 +67,16 @@ function updateCalculation() {
 
         // Calculate for each hit rule type
         for (const [ruleType, ruleInfo] of Object.entries(HIT_RULES)) {
-            const result = compute_combat_damage(
-                attacks, toHit, toWound, rend, damage, save, ward, ruleType
-            );
+            const result = compute_combat_damage({
+                attacks,
+                to_hit: toHit,
+                to_wound: toWound,
+                rend,
+                damage,
+                save,
+                ward,
+                hit_rule_type: ruleType
+            });
             results[ruleType] = {
                 data: result,
                 info: ruleInfo
