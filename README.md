@@ -1,7 +1,7 @@
 # rs-aos-stats
 
-[![CI](https://github.com/YOUR_USERNAME/rs-aos-stats/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/rs-aos-stats/actions/workflows/ci.yml)
-[![Deploy](https://github.com/YOUR_USERNAME/rs-aos-stats/actions/workflows/deploy.yml/badge.svg)](https://github.com/YOUR_USERNAME/rs-aos-stats/actions/workflows/deploy.yml)
+[![CI](https://github.com/alexis-mignon/rs-aos-stats/actions/workflows/ci.yml/badge.svg)](https://github.com/alexis-mignon/rs-aos-stats/actions/workflows/ci.yml)
+[![Deploy](https://github.com/alexis-mignon/rs-aos-stats/actions/workflows/deploy.yml/badge.svg)](https://github.com/alexis-mignon/rs-aos-stats/actions/workflows/deploy.yml)
 
 Computing damage statistics for Warhammer Age Of Sigmar
 
@@ -9,9 +9,7 @@ Une bibliothèque Rust pour calculer les probabilités de dégâts dans Warhamme
 
 ## 🎮 Démo en ligne
 
-**Essayez la démo interactive** : [https://YOUR_USERNAME.github.io/rs-aos-stats/](https://YOUR_USERNAME.github.io/rs-aos-stats/)
-
-> Remplacez `YOUR_USERNAME` par votre nom d'utilisateur GitHub après avoir activé GitHub Pages
+**Essayez la démo interactive** : [https://alexis-mignon.github.io/rs-aos-stats/](https://alexis-mignon.github.io/rs-aos-stats/)
 
 ## Fonctionnalités
 
