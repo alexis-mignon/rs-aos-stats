@@ -223,44 +223,6 @@
             display: block;
         }
 
-        .tooltip-icon {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            background: #722f37;
-            color: white;
-            border-radius: 50%;
-            text-align: center;
-            font-size: 12px;
-            line-height: 16px;
-            cursor: help;
-            margin-left: 5px;
-            font-weight: bold;
-        }
-
-        .tooltip-icon:hover {
-            background: #4a1e23;
-        }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            font-size: 1em;
-            font-family: 'Courier New', monospace;
-            transition: border-color 0.3s;
-        }
-
-        input[type="text"]:focus {
-            outline: none;
-            border-color: #722f37;
-        }
-
-        input[type="text"]::placeholder {
-            color: #999;
-            font-style: italic;
-        }
     </style>
 </head>
 <body>
@@ -289,11 +251,11 @@
                     </div>
                     <div class="input-row" id="attacks-n-row">
                         <label>
-                            N (multiplier): <span class="value-display" id="attacks-n-value">1</span>
+                            Value: <span class="value-display" id="attacks-n-value">10</span>
                         </label>
-                        <input type="range" id="attacks-n" min="1" max="40" value="1">
+                        <input type="range" id="attacks-n" min="1" max="40" value="10">
                     </div>
-                    <div class="input-row" id="attacks-m-row">
+                    <div class="input-row" id="attacks-m-row" style="display: none;">
                         <label>
                             M (modifier): <span class="value-display" id="attacks-m-value">0</span>
                         </label>
