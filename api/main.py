@@ -170,17 +170,20 @@ async def calculate_damage(params: CombatParams):
             damage
         )
 
+        # Normalize ward: treat 7 as no ward (consistent with web app)
+        effective_ward = params.ward if params.ward is not None and params.ward < 7 else None
+
         # Create defense stats (positional: save, ward)
         defense_stats = aos.DefenseStats(
             params.save,
-            params.ward
+            effective_ward
         )
 
         # Create combat config (attack_stats, defense_stats, roll_modifier)
         config = aos.CombatConfig(attack_stats, defense_stats, None)
 
         # Get rule sequence using the binding's built-in helper
-        rules = aos.build_standard_sequence(params.hit_rule_type, params.ward is not None)
+        rules = aos.build_standard_sequence(params.hit_rule_type, effective_ward is not None)
 
         # Compute damages
         result = aos.compute_damages(config, rules)
