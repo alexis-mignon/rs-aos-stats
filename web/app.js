@@ -52,9 +52,9 @@ function setupEventListeners() {
             mRow.style.display = 'none';
             attacksN.min = 1;
             attacksN.max = 40;
-            attacksN.value = 10;
-            document.getElementById('attacks-n-value').textContent = '10';
-            nLabel.innerHTML = 'Value: <span class="value-display" id="attacks-n-value">10</span>';
+            attacksN.value = 1;
+            document.getElementById('attacks-n-value').textContent = '1';
+            nLabel.innerHTML = 'Value: <span class="value-display" id="attacks-n-value">1</span>';
         } else if (type === 'D3' || type === 'D6') {
             nRow.style.display = 'none';
             mRow.style.display = 'none';
@@ -62,7 +62,10 @@ function setupEventListeners() {
             nRow.style.display = 'block';
             mRow.style.display = 'block';
             attacksN.min = 1;
-            attacksN.max = 40;
+            attacksN.max = 4;
+            if (parseInt(attacksN.value, 10) > 4) {
+                attacksN.value = 4;
+            }
             nLabel.innerHTML = 'N (multiplier): <span class="value-display" id="attacks-n-value">' + attacksN.value + '</span>';
         }
 
@@ -92,7 +95,10 @@ function setupEventListeners() {
             nRow.style.display = 'block';
             mRow.style.display = 'block';
             damageN.min = 1;
-            damageN.max = 10;
+            damageN.max = 4;
+            if (parseInt(damageN.value, 10) > 4) {
+                damageN.value = 4;
+            }
             nLabel.innerHTML = 'N (multiplier): <span class="value-display" id="damage-n-value">' + damageN.value + '</span>';
         }
 
@@ -173,16 +179,22 @@ function initializeControlVisibility() {
     if (attacksType === 'fixed') {
         attacksNRow.style.display = 'block';
         attacksMRow.style.display = 'none';
-        document.getElementById('attacks-n').value = 10;
-        document.getElementById('attacks-n-value').textContent = '10';
-        attacksNLabel.innerHTML = 'Value: <span class="value-display" id="attacks-n-value">10</span>';
+        document.getElementById('attacks-n').value = 1;
+        document.getElementById('attacks-n-value').textContent = '1';
+        attacksNLabel.innerHTML = 'Value: <span class="value-display" id="attacks-n-value">1</span>';
     } else if (attacksType === 'D3' || attacksType === 'D6') {
         attacksNRow.style.display = 'none';
         attacksMRow.style.display = 'none';
     } else if (attacksType === 'ND3' || attacksType === 'ND6') {
         attacksNRow.style.display = 'block';
         attacksMRow.style.display = 'block';
-        attacksNLabel.innerHTML = 'N (multiplier): <span class="value-display" id="attacks-n-value">' + document.getElementById('attacks-n').value + '</span>';
+        const attacksNInput = document.getElementById('attacks-n');
+        attacksNInput.min = 1;
+        attacksNInput.max = 4;
+        if (parseInt(attacksNInput.value, 10) > 4) {
+            attacksNInput.value = 4;
+        }
+        attacksNLabel.innerHTML = 'N (multiplier): <span class="value-display" id="attacks-n-value">' + attacksNInput.value + '</span>';
     }
 
     // Initialize damage controls
@@ -203,7 +215,13 @@ function initializeControlVisibility() {
     } else if (damageType === 'ND3' || damageType === 'ND6') {
         damageNRow.style.display = 'block';
         damageMRow.style.display = 'block';
-        damageNLabel.innerHTML = 'N (multiplier): <span class="value-display" id="damage-n-value">' + document.getElementById('damage-n').value + '</span>';
+        const damageNInput = document.getElementById('damage-n');
+        damageNInput.min = 1;
+        damageNInput.max = 4;
+        if (parseInt(damageNInput.value, 10) > 4) {
+            damageNInput.value = 4;
+        }
+        damageNLabel.innerHTML = 'N (multiplier): <span class="value-display" id="damage-n-value">' + damageNInput.value + '</span>';
     }
 }
 
@@ -270,7 +288,8 @@ function buildAttacksCharacteristic() {
         return m > 0 ? `${n}D6+${m}` : `${n}D6`;
     }
 
-    return '10';
+    // Fallback should be consistent with the fixed-mode default of 1 attack
+    return '1';
 }
 
 function buildDamageCharacteristic() {
