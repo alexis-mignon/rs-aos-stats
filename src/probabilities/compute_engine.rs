@@ -130,11 +130,7 @@ pub type CombatDist = HashMap<CombatStatus, f64>;
 /// Apply a single rule to a distribution of combat statuses, returning the
 /// new distribution. States that end up with identical `CombatStatus`
 /// are merged by summing their probabilities.
-fn apply_rule(
-    dist: &CombatDist,
-    config: CombatConfig,
-    rule: &dyn Rule,
-) -> CombatDist {
+fn apply_rule(dist: &CombatDist, config: CombatConfig, rule: &dyn Rule) -> CombatDist {
     let mut new_dist: CombatDist = HashMap::new();
 
     for (status, p) in dist.iter() {
@@ -176,8 +172,7 @@ pub fn damages_from_distribution(dist: &CombatDist) -> Vec<(u32, f64)> {
         *damage_map.entry(status.damages).or_insert(0.0) += p;
     }
 
-    let mut damages_probas_vec: Vec<(u32, f64)> =
-        damage_map.into_iter().map(|(d, p)| (d, p)).collect();
+    let mut damages_probas_vec: Vec<(u32, f64)> = damage_map.into_iter().collect();
     damages_probas_vec.sort_by(|a, b| a.0.cmp(&b.0));
     damages_probas_vec
 }
@@ -261,5 +256,4 @@ mod tests {
         assert_eq!(config.modifier.to_hit, 1);
         assert_eq!(config.modifier.to_wound, -1);
     }
-
 }

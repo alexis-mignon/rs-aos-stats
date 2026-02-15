@@ -26,12 +26,7 @@ impl Rule for AttackCharacteristicRule {
 
         values_and_probas
             .iter()
-            .map(|(value, proba)| {
-                (
-                    status.with_attacks(*value),
-                    probability * proba,
-                )
-            })
+            .map(|(value, proba)| (status.with_attacks(*value), probability * proba))
             .collect()
     }
 }
@@ -180,9 +175,7 @@ impl TestRollRule for WoundRule {
         vec![success_proba, 1.0 - success_proba]
     }
     fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
-        status
-            .with_hits(0)
-            .with_wounds(counts[0] + status.wounds)
+        status.with_hits(0).with_wounds(counts[0] + status.wounds)
     }
 }
 
@@ -223,9 +216,7 @@ impl TestRollRule for SaveRule {
         vec![success_proba, 1.0 - success_proba]
     }
     fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
-        status
-            .with_hits(0)
-            .with_wounds(status.wounds - counts[0])
+        status.with_hits(0).with_wounds(status.wounds - counts[0])
     }
 }
 
@@ -260,11 +251,7 @@ impl DamagesRule {
 
         let single = roll.values_and_probas();
         // Maximum damage from a single wound
-        let max_single = single
-            .iter()
-            .map(|(v, _)| *v as usize)
-            .max()
-            .unwrap_or(0);
+        let max_single = single.iter().map(|(v, _)| *v as usize).max().unwrap_or(0);
 
         if max_single == 0 {
             return vec![(0, 1.0)];

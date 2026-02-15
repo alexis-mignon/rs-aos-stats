@@ -12,5 +12,12 @@ classifiers = [
 ]
 dynamic = ["version"]
 
+[project.optional-dependencies]
+dev = [
+    "pre-commit",
+    "pytest",
+    "hypothesis",
+]
+
 [tool.maturin]
 features = ["pyo3/extension-module"]
