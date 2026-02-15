@@ -363,7 +363,9 @@ impl Rule for WardRule {
         if config.defense_stats.ward.is_some() {
             TestRollRule::apply_distribution(self, status, probability, config)
         } else {
-            vec![]
+            // When no ward is present, this rule should behave as a no-op
+            // so that including it in a sequence does not change results.
+            vec![(*status, probability)]
         }
     }
 }
@@ -689,16 +691,19 @@ mod tests {
         assert!(has_positive_damage);
     }
 
-    /// Test WardRule when no ward save is present. The rule should return
-    /// an empty vector when config.defense_stats.ward is None.
+    /// Test WardRule when no ward save is present. The rule should behave
+    /// as a no-op so sequences including it don't change results.
     #[test]
     fn ward_rule_no_ward() {
         let config = make_config(1, 2, 2, 0, 1, 7, None);
         let ward_rule = WardRule;
         let status = CombatStatus::new_with_values(0, 0, 0, 0, 1);
         let result = ward_rule.apply(&status, 1.0, &config);
-        // When no ward is present, WardRule should return an empty vector
-        assert_eq!(result.len(), 0);
+        // When no ward is present, WardRule should leave the state unchanged
+        // and preserve the probability.
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].0, status);
+        assert!((result[0].1 - 1.0).abs() < 1e-12);
     }
 
     /// Helper: compute mean damage for a given config and sequence.
