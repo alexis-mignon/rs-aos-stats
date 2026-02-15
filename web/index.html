@@ -45,25 +45,6 @@
             opacity: 0.9;
         }
 
-        .nav {
-            background: #f8f9fa;
-            padding: 10px 30px;
-            border-bottom: 1px solid #dee2e6;
-        }
-
-        .nav a {
-            color: #722f37;
-            text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            transition: background 0.3s;
-            font-weight: 600;
-        }
-
-        .nav a:hover {
-            background: #e9ecef;
-        }
-
         .content {
             display: flex;
             flex-wrap: wrap;
@@ -241,6 +222,45 @@
         .error.active {
             display: block;
         }
+
+        .tooltip-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background: #722f37;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            font-size: 12px;
+            line-height: 16px;
+            cursor: help;
+            margin-left: 5px;
+            font-weight: bold;
+        }
+
+        .tooltip-icon:hover {
+            background: #4a1e23;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 1em;
+            font-family: 'Courier New', monospace;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #722f37;
+        }
+
+        input[type="text"]::placeholder {
+            color: #999;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -250,19 +270,34 @@
             <p class="subtitle">Calculate and visualize combat damage probabilities with WebAssembly</p>
         </header>
 
-        <div class="nav">
-            <a href="compare.html">Comparison Mode →</a>
-        </div>
-
         <div class="content">
             <div class="controls">
                 <div class="control-group">
                     <h2>Attack Stats</h2>
                     <div class="input-row">
                         <label>
-                            Attacks: <span class="value-display" id="attacks-value">10</span>
+                            Attacks:
+                            <span class="value-display" id="attacks-notation" style="background: #4a1e23; min-width: 80px;">10</span>
                         </label>
-                        <input type="range" id="attacks" min="1" max="30" value="10">
+                        <select id="attacks-type">
+                            <option value="fixed">Fixed Value</option>
+                            <option value="D3">D3</option>
+                            <option value="D6">D6</option>
+                            <option value="ND3">ND3+M</option>
+                            <option value="ND6">ND6+M</option>
+                        </select>
+                    </div>
+                    <div class="input-row" id="attacks-n-row">
+                        <label>
+                            N (multiplier): <span class="value-display" id="attacks-n-value">1</span>
+                        </label>
+                        <input type="range" id="attacks-n" min="1" max="40" value="1">
+                    </div>
+                    <div class="input-row" id="attacks-m-row">
+                        <label>
+                            M (modifier): <span class="value-display" id="attacks-m-value">0</span>
+                        </label>
+                        <input type="range" id="attacks-m" min="0" max="20" value="0">
                     </div>
                     <div class="input-row">
                         <label>
@@ -284,9 +319,28 @@
                     </div>
                     <div class="input-row">
                         <label>
-                            Damage: <span class="value-display" id="damage-value">1</span>
+                            Damage:
+                            <span class="value-display" id="damage-notation" style="background: #4a1e23; min-width: 80px;">1</span>
                         </label>
-                        <input type="range" id="damage" min="1" max="6" value="1">
+                        <select id="damage-type">
+                            <option value="fixed">Fixed Value</option>
+                            <option value="D3">D3</option>
+                            <option value="D6">D6</option>
+                            <option value="ND3">ND3+M</option>
+                            <option value="ND6">ND6+M</option>
+                        </select>
+                    </div>
+                    <div class="input-row" id="damage-n-row" style="display: none;">
+                        <label>
+                            N (multiplier): <span class="value-display" id="damage-n-value">1</span>
+                        </label>
+                        <input type="range" id="damage-n" min="1" max="10" value="1">
+                    </div>
+                    <div class="input-row" id="damage-m-row" style="display: none;">
+                        <label>
+                            M (modifier): <span class="value-display" id="damage-m-value">0</span>
+                        </label>
+                        <input type="range" id="damage-m" min="0" max="10" value="0">
                     </div>
                 </div>
 
