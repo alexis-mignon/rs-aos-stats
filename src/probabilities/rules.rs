@@ -621,7 +621,10 @@ mod tests {
         let config = make_config(10, 3, 3, 1, 1, 4, None);
         let normal = mean_damage(config, &standard_sequence());
         let crit = mean_damage(config, &crit_sequence(Box::new(CritAutoWoundRule)));
-        assert!(crit > normal, "CritAutoWound ({crit:.4}) should exceed normal ({normal:.4})");
+        assert!(
+            crit > normal,
+            "CritAutoWound ({crit:.4}) should exceed normal ({normal:.4})"
+        );
     }
 
     /// CritMortalWoundRule should increase mean damage compared to normal hits.
@@ -630,7 +633,10 @@ mod tests {
         let config = make_config(10, 3, 3, 1, 1, 4, None);
         let normal = mean_damage(config, &standard_sequence());
         let crit = mean_damage(config, &crit_sequence(Box::new(CritMortalWoundRule)));
-        assert!(crit > normal, "CritMortalWound ({crit:.4}) should exceed normal ({normal:.4})");
+        assert!(
+            crit > normal,
+            "CritMortalWound ({crit:.4}) should exceed normal ({normal:.4})"
+        );
     }
 
     /// CritDoubleHitRule should increase mean damage compared to normal hits.
@@ -639,7 +645,10 @@ mod tests {
         let config = make_config(10, 3, 3, 1, 1, 4, None);
         let normal = mean_damage(config, &standard_sequence());
         let crit = mean_damage(config, &crit_sequence(Box::new(CritDoubleHitRule)));
-        assert!(crit > normal, "CritDoubleHit ({crit:.4}) should exceed normal ({normal:.4})");
+        assert!(
+            crit > normal,
+            "CritDoubleHit ({crit:.4}) should exceed normal ({normal:.4})"
+        );
     }
 
     /// All crit rules should increase mean damage even with a difficult
@@ -649,12 +658,24 @@ mod tests {
         let config = make_config(10, 6, 3, 0, 1, 4, None);
         let normal = mean_damage(config, &standard_sequence());
         for (name, rule) in [
-            ("CritAutoWound", Box::new(CritAutoWoundRule) as Box<dyn Rule>),
-            ("CritMortalWound", Box::new(CritMortalWoundRule) as Box<dyn Rule>),
-            ("CritDoubleHit", Box::new(CritDoubleHitRule) as Box<dyn Rule>),
+            (
+                "CritAutoWound",
+                Box::new(CritAutoWoundRule) as Box<dyn Rule>,
+            ),
+            (
+                "CritMortalWound",
+                Box::new(CritMortalWoundRule) as Box<dyn Rule>,
+            ),
+            (
+                "CritDoubleHit",
+                Box::new(CritDoubleHitRule) as Box<dyn Rule>,
+            ),
         ] {
             let crit = mean_damage(config, &crit_sequence(rule));
-            assert!(crit > normal, "{name} ({crit:.4}) should exceed normal ({normal:.4}) at 6+ to hit");
+            assert!(
+                crit > normal,
+                "{name} ({crit:.4}) should exceed normal ({normal:.4}) at 6+ to hit"
+            );
         }
     }
 

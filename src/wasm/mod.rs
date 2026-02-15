@@ -200,12 +200,12 @@ pub fn compute_combat_damage_with_dice(params: JsValue) -> Result<JsValue, JsVal
         serde_wasm_bindgen::from_value(params).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
     // Parse attacks characteristic
-    let attacks_char = parse_characteristic(&params.attacks_characteristic)
-        .map_err(|e| JsValue::from_str(&e))?;
+    let attacks_char =
+        parse_characteristic(&params.attacks_characteristic).map_err(|e| JsValue::from_str(&e))?;
 
     // Parse damage characteristic
-    let damage_char = parse_characteristic(&params.damage_characteristic)
-        .map_err(|e| JsValue::from_str(&e))?;
+    let damage_char =
+        parse_characteristic(&params.damage_characteristic).map_err(|e| JsValue::from_str(&e))?;
 
     let attack_stats = AttackStats::new(
         attacks_char,

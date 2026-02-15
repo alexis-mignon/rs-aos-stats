@@ -8,7 +8,7 @@ use crate::python::combat_stats::{
 };
 use crate::python::combat_tree::{compute_damages_py, CombatConfigPy};
 use crate::python::dice::{DiceRollPy, ND3Plus, ND6Plus, D3, D6, ND3, ND6};
-use crate::python::rules::{register_rules, build_standard_sequence_py};
+use crate::python::rules::{build_standard_sequence_py, register_rules};
 use pyo3::prelude::*;
 
 #[pymodule]
