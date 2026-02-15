@@ -132,3 +132,100 @@ class TestComputeDamages:
 
         with pytest.raises(BaseException):
             compute_damages(config, [42])
+
+
+WARD_SEQUENCE = STANDARD_SEQUENCE + [WardRule()]
+
+
+def _mean(result):
+    return sum(d * p for d, p in result)
+
+
+def _crit_sequence(crit_rule):
+    return [
+        AttackCharacteristicRule(), crit_rule,
+        WoundRule(), SaveRule(), DamagesRule(),
+    ]
+
+
+class TestCritRulesIncreaseDamage:
+    """Each crit rule should produce strictly higher mean damage than normal."""
+
+    @pytest.fixture()
+    def standard_config(self):
+        return CombatConfig(
+            AttackStats(10, 3, 3, 1, 1), DefenseStats(4, None), None,
+        )
+
+    @pytest.fixture()
+    def normal_mean(self, standard_config):
+        return _mean(compute_damages(standard_config, STANDARD_SEQUENCE))
+
+    @pytest.mark.parametrize("crit_rule", [
+        CritAutoWoundRule(),
+        CritMortalWoundRule(),
+        CritDoubleHitRule(),
+    ])
+    def test_crit_increases_mean(self, standard_config, normal_mean, crit_rule):
+        crit_mean = _mean(compute_damages(standard_config, _crit_sequence(crit_rule)))
+        assert crit_mean > normal_mean
+
+    @pytest.mark.parametrize("crit_rule", [
+        CritAutoWoundRule(),
+        CritMortalWoundRule(),
+        CritDoubleHitRule(),
+    ])
+    def test_crit_increases_mean_at_six_plus(self, crit_rule):
+        """Crit benefit is most pronounced when only crits hit (6+)."""
+        config = CombatConfig(
+            AttackStats(10, 6, 3, 0, 1), DefenseStats(4, None), None,
+        )
+        normal = _mean(compute_damages(config, STANDARD_SEQUENCE))
+        crit = _mean(compute_damages(config, _crit_sequence(crit_rule)))
+        assert crit > normal
+
+    @pytest.mark.parametrize("crit_rule", [
+        CritAutoWoundRule(),
+        CritMortalWoundRule(),
+        CritDoubleHitRule(),
+    ])
+    def test_crit_increases_mean_with_ward(self, crit_rule):
+        """Crit rules should still increase damage when a ward save is present."""
+        config = CombatConfig(
+            AttackStats(10, 3, 3, 1, 2), DefenseStats(4, 5), None,
+        )
+        normal = _mean(compute_damages(config, WARD_SEQUENCE))
+        crit = _mean(compute_damages(config, _crit_sequence(crit_rule) + [WardRule()]))
+        assert crit > normal
+
+
+class TestWardReducesDamage:
+    """Ward saves should strictly reduce mean damage."""
+
+    @pytest.mark.parametrize("attacks,to_hit,to_wound,rend,dmg,save,ward", [
+        (10, 3, 3, 1, 1, 4, 4),
+        (5, 2, 2, 0, 2, 5, 5),
+        (3, 4, 4, 2, 3, 3, 6),
+    ])
+    def test_ward_reduces_mean(self, attacks, to_hit, to_wound, rend, dmg, save, ward):
+        config_ward = CombatConfig(
+            AttackStats(attacks, to_hit, to_wound, rend, dmg),
+            DefenseStats(save, ward), None,
+        )
+        config_no_ward = CombatConfig(
+            AttackStats(attacks, to_hit, to_wound, rend, dmg),
+            DefenseStats(save, None), None,
+        )
+        mean_with = _mean(compute_damages(config_ward, WARD_SEQUENCE))
+        mean_without = _mean(compute_damages(config_no_ward, STANDARD_SEQUENCE))
+        assert mean_with < mean_without
+
+    def test_stronger_ward_reduces_more(self):
+        """A 4+ ward should reduce damage more than a 5+ ward."""
+        attack_stats = AttackStats(10, 3, 3, 1, 2)
+        config_4plus = CombatConfig(attack_stats, DefenseStats(4, 4), None)
+        config_5plus = CombatConfig(attack_stats, DefenseStats(4, 5), None)
+
+        mean_4 = _mean(compute_damages(config_4plus, WARD_SEQUENCE))
+        mean_5 = _mean(compute_damages(config_5plus, WARD_SEQUENCE))
+        assert mean_4 < mean_5

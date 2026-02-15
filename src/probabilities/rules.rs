@@ -595,4 +595,104 @@ mod tests {
         // When no ward is present, WardRule should return an empty vector
         assert_eq!(result.len(), 0);
     }
+
+    /// Helper: compute mean damage for a given config and sequence.
+    fn mean_damage(config: CombatConfig, sequence: &Vec<Box<dyn Rule>>) -> f64 {
+        compute_damages(config, sequence)
+            .iter()
+            .map(|(d, p)| *d as f64 * p)
+            .sum()
+    }
+
+    /// Helper: build a crit sequence replacing HitRule with the given crit rule.
+    fn crit_sequence(crit_rule: Box<dyn Rule>) -> Vec<Box<dyn Rule>> {
+        vec![
+            Box::new(AttackCharacteristicRule),
+            crit_rule,
+            Box::new(WoundRule),
+            Box::new(SaveRule),
+            Box::new(DamagesRule),
+        ]
+    }
+
+    /// CritAutoWoundRule should increase mean damage compared to normal hits.
+    #[test]
+    fn crit_auto_wound_increases_mean_damage() {
+        let config = make_config(10, 3, 3, 1, 1, 4, None);
+        let normal = mean_damage(config, &standard_sequence());
+        let crit = mean_damage(config, &crit_sequence(Box::new(CritAutoWoundRule)));
+        assert!(crit > normal, "CritAutoWound ({crit:.4}) should exceed normal ({normal:.4})");
+    }
+
+    /// CritMortalWoundRule should increase mean damage compared to normal hits.
+    #[test]
+    fn crit_mortal_wound_increases_mean_damage() {
+        let config = make_config(10, 3, 3, 1, 1, 4, None);
+        let normal = mean_damage(config, &standard_sequence());
+        let crit = mean_damage(config, &crit_sequence(Box::new(CritMortalWoundRule)));
+        assert!(crit > normal, "CritMortalWound ({crit:.4}) should exceed normal ({normal:.4})");
+    }
+
+    /// CritDoubleHitRule should increase mean damage compared to normal hits.
+    #[test]
+    fn crit_double_hit_increases_mean_damage() {
+        let config = make_config(10, 3, 3, 1, 1, 4, None);
+        let normal = mean_damage(config, &standard_sequence());
+        let crit = mean_damage(config, &crit_sequence(Box::new(CritDoubleHitRule)));
+        assert!(crit > normal, "CritDoubleHit ({crit:.4}) should exceed normal ({normal:.4})");
+    }
+
+    /// All crit rules should increase mean damage even with a difficult
+    /// to-hit roll (6+ means only crits land).
+    #[test]
+    fn crit_rules_increase_damage_at_six_plus_to_hit() {
+        let config = make_config(10, 6, 3, 0, 1, 4, None);
+        let normal = mean_damage(config, &standard_sequence());
+        for (name, rule) in [
+            ("CritAutoWound", Box::new(CritAutoWoundRule) as Box<dyn Rule>),
+            ("CritMortalWound", Box::new(CritMortalWoundRule) as Box<dyn Rule>),
+            ("CritDoubleHit", Box::new(CritDoubleHitRule) as Box<dyn Rule>),
+        ] {
+            let crit = mean_damage(config, &crit_sequence(rule));
+            assert!(crit > normal, "{name} ({crit:.4}) should exceed normal ({normal:.4}) at 6+ to hit");
+        }
+    }
+
+    /// Ward save should strictly reduce mean damage across several profiles.
+    #[test]
+    fn ward_reduces_mean_damage() {
+        let profiles = [
+            make_config(10, 3, 3, 1, 1, 4, Some(4)),
+            make_config(5, 2, 2, 0, 2, 5, Some(5)),
+            make_config(3, 4, 4, 2, 3, 3, Some(6)),
+        ];
+        for config in profiles {
+            let mut ward_sequence = standard_sequence();
+            ward_sequence.push(Box::new(WardRule));
+
+            let without = mean_damage(config, &standard_sequence());
+            let with = mean_damage(config, &ward_sequence);
+            assert!(
+                with < without,
+                "Ward should reduce damage: {with:.4} >= {without:.4} for config {:?}",
+                config
+            );
+        }
+    }
+
+    /// Stronger ward saves (lower threshold) should reduce damage more.
+    #[test]
+    fn stronger_ward_reduces_more() {
+        let config_4plus = make_config(10, 3, 3, 1, 2, 4, Some(4));
+        let config_5plus = make_config(10, 3, 3, 1, 2, 4, Some(5));
+        let mut ward_sequence = standard_sequence();
+        ward_sequence.push(Box::new(WardRule));
+
+        let mean_4plus = mean_damage(config_4plus, &ward_sequence);
+        let mean_5plus = mean_damage(config_5plus, &ward_sequence);
+        assert!(
+            mean_4plus < mean_5plus,
+            "4+ ward ({mean_4plus:.4}) should reduce more than 5+ ({mean_5plus:.4})"
+        );
+    }
 }
