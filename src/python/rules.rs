@@ -248,17 +248,15 @@ pub fn build_standard_sequence_py(
         }
     }
 
-    // Always continue with wound and save
+    // Always continue with wound, save, and damages
     rules.push(Py::new(py, WoundRulePy)?.into());
     rules.push(Py::new(py, SaveRulePy)?.into());
+    rules.push(Py::new(py, DamagesRulePy)?.into());
 
-    // Add ward if present
+    // Add ward after damages (WardRule operates on status.damages)
     if has_ward {
         rules.push(Py::new(py, WardRulePy)?.into());
     }
-
-    // Always end with damages
-    rules.push(Py::new(py, DamagesRulePy)?.into());
 
     Ok(rules)
 }
