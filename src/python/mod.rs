@@ -8,7 +8,7 @@ use crate::python::combat_stats::{
 };
 use crate::python::combat_tree::{compute_damages_py, CombatConfigPy};
 use crate::python::dice::{DiceRollPy, ND3Plus, ND6Plus, D3, D6, ND3, ND6};
-use crate::python::rules::register_rules;
+use crate::python::rules::{register_rules, build_standard_sequence_py};
 use pyo3::prelude::*;
 
 #[pymodule]
@@ -28,6 +28,7 @@ fn rs_aos_stats(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Add combat trees functions
     m.add_class::<CombatConfigPy>()?;
     m.add_function(wrap_pyfunction!(compute_damages_py, m)?)?;
+    m.add_function(wrap_pyfunction!(build_standard_sequence_py, m)?)?;
     // Rules
     register_rules(_py, m)?;
     Ok(())

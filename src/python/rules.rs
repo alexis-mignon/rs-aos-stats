@@ -214,3 +214,51 @@ pub fn register_rules(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<CritDoubleHitRulePy>()?;
     Ok(())
 }
+
+#[pyfunction(name = "build_standard_sequence")]
+pub fn build_standard_sequence_py(
+    py: Python<'_>,
+    hit_rule_type: &str,
+    has_ward: bool,
+) -> PyResult<Vec<PyObject>> {
+    let mut rules: Vec<PyObject> = Vec::new();
+
+    // Always start with attack characteristic
+    rules.push(Py::new(py, AttackCharacteristicRulePy)?.into());
+
+    // Add hit rule based on type
+    match hit_rule_type {
+        "normal" => {
+            rules.push(Py::new(py, HitRulePy)?.into());
+        }
+        "crit_auto_wound" => {
+            rules.push(Py::new(py, CritAutoWoundRulePy)?.into());
+        }
+        "crit_mortal_wound" => {
+            rules.push(Py::new(py, CritMortalWoundRulePy)?.into());
+        }
+        "crit_double_hit" => {
+            rules.push(Py::new(py, CritDoubleHitRulePy)?.into());
+        }
+        _ => {
+            return Err(PyValueError::new_err(format!(
+                "Invalid hit_rule_type '{}'. Must be one of: 'normal', 'crit_auto_wound', 'crit_mortal_wound', 'crit_double_hit'",
+                hit_rule_type
+            )));
+        }
+    }
+
+    // Always continue with wound and save
+    rules.push(Py::new(py, WoundRulePy)?.into());
+    rules.push(Py::new(py, SaveRulePy)?.into());
+
+    // Add ward if present
+    if has_ward {
+        rules.push(Py::new(py, WardRulePy)?.into());
+    }
+
+    // Always end with damages
+    rules.push(Py::new(py, DamagesRulePy)?.into());
+
+    Ok(rules)
+}
