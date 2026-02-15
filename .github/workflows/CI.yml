@@ -35,7 +35,10 @@ jobs:
           PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist --find-interpreter
+          # Build abi3 wheels using a fixed interpreter (Python 3.10)
+          # instead of auto-detecting, so we don't rely on
+          # yet-unsupported versions like 3.14.
+          args: --release --out dist --interpreter python3.10
           sccache: 'true'
           manylinux: auto
       - name: Upload wheels
@@ -61,7 +64,8 @@ jobs:
           PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist --find-interpreter
+          # Same as on Linux: pin the interpreter to Python 3.10.
+          args: --release --out dist --interpreter python3.10
           sccache: 'true'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -85,7 +89,8 @@ jobs:
           PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist --find-interpreter
+          # Same as on Linux: pin the interpreter to Python 3.10.
+          args: --release --out dist --interpreter python3.10
           sccache: 'true'
       - name: Upload wheels
         uses: actions/upload-artifact@v4
