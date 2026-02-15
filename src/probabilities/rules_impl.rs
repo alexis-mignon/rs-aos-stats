@@ -1,5 +1,5 @@
 use crate::probabilities::combat_stats::Characteristic;
-use crate::probabilities::combat_tree::{CombatConfig, CombatNode, CombatStatus, Rule};
+use crate::probabilities::compute_engine::{CombatConfig, CombatStatus, Rule};
 use crate::probabilities::dice::DiceRoll;
 use crate::probabilities::partitions::generate_partitions_probabilities;
 
@@ -7,8 +7,13 @@ use crate::probabilities::partitions::generate_partitions_probabilities;
 pub struct AttackCharacteristicRule;
 /// Dertmines the number of attacks
 impl Rule for AttackCharacteristicRule {
-    fn apply(&self, node: &CombatNode) -> Vec<CombatNode> {
-        let attack_num_stat = node.config.attack_stats.attacks;
+    fn apply(
+        &self,
+        status: &CombatStatus,
+        probability: f64,
+        config: &CombatConfig,
+    ) -> Vec<(CombatStatus, f64)> {
+        let attack_num_stat = config.attack_stats.attacks;
 
         let values_and_probas = match attack_num_stat {
             Characteristic::Value(value) => vec![(value, 1.0)],
@@ -18,10 +23,9 @@ impl Rule for AttackCharacteristicRule {
         values_and_probas
             .iter()
             .map(|(value, proba)| {
-                CombatNode::new(
-                    node.status.with_attacks(*value),
-                    node.config,
-                    node.probability * proba,
+                (
+                    status.with_attacks(*value),
+                    probability * proba,
                 )
             })
             .collect()
@@ -31,18 +35,23 @@ impl Rule for AttackCharacteristicRule {
 pub trait TestRollRule: Rule {
     fn roll_count(&self, status: &CombatStatus) -> u32;
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64>;
-    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode;
+    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus;
 
-    fn apply(&self, node: &CombatNode) -> Vec<CombatNode> {
-        let probas = self.partition_prior(&node.config);
-        let nrolls = self.roll_count(&node.status);
+    fn apply_distribution(
+        &self,
+        status: &CombatStatus,
+        probability: f64,
+        config: &CombatConfig,
+    ) -> Vec<(CombatStatus, f64)> {
+        let probas = self.partition_prior(config);
+        let nrolls = self.roll_count(status);
         let partitions = generate_partitions_probabilities(nrolls, &probas);
-        let mut nodes = vec![];
+        let mut results = vec![];
         for (counts, proba) in partitions {
-            let new_node = self.build_node(node, &counts, proba);
-            nodes.push(new_node);
+            let new_status = self.build_status(status, &counts);
+            results.push((new_status, probability * proba));
         }
-        nodes
+        results
     }
 }
 
@@ -76,17 +85,13 @@ pub trait BaseHitRule: TestRollRule {
     }
 
     fn result(&self, partition: &[u32]) -> (u32, u32, u32);
-    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
+    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
         let (hits, wounds, mortal_wounds) = self.result(counts);
-        CombatNode::new(
-            node.status
-                .with_attacks(0)
-                .with_hits(hits)
-                .with_wounds(wounds)
-                .with_mortal_wounds(mortal_wounds),
-            node.config,
-            node.probability * probability,
-        )
+        status
+            .with_attacks(0)
+            .with_hits(hits)
+            .with_wounds(wounds)
+            .with_mortal_wounds(mortal_wounds)
     }
 }
 
@@ -106,14 +111,19 @@ impl TestRollRule for HitRule {
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
         BaseHitRule::partition_prior(self, config)
     }
-    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
-        BaseHitRule::build_node(self, node, counts, probability)
+    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
+        BaseHitRule::build_status(self, status, counts)
     }
 }
 
 impl Rule for HitRule {
-    fn apply(&self, node: &CombatNode) -> Vec<CombatNode> {
-        TestRollRule::apply(self, node)
+    fn apply(
+        &self,
+        status: &CombatStatus,
+        probability: f64,
+        config: &CombatConfig,
+    ) -> Vec<(CombatStatus, f64)> {
+        TestRollRule::apply_distribution(self, status, probability, config)
     }
 }
 
@@ -138,20 +148,21 @@ impl TestRollRule for WoundRule {
 
         vec![success_proba, 1.0 - success_proba]
     }
-    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
-        CombatNode::new(
-            node.status
-                .with_hits(0)
-                .with_wounds(counts[0] + node.status.wounds),
-            node.config,
-            probability * node.probability,
-        )
+    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
+        status
+            .with_hits(0)
+            .with_wounds(counts[0] + status.wounds)
     }
 }
 
 impl Rule for WoundRule {
-    fn apply(&self, node: &CombatNode) -> Vec<CombatNode> {
-        TestRollRule::apply(self, node)
+    fn apply(
+        &self,
+        status: &CombatStatus,
+        probability: f64,
+        config: &CombatConfig,
+    ) -> Vec<(CombatStatus, f64)> {
+        TestRollRule::apply_distribution(self, status, probability, config)
     }
 }
 
@@ -177,20 +188,21 @@ impl TestRollRule for SaveRule {
 
         vec![success_proba, 1.0 - success_proba]
     }
-    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
-        CombatNode::new(
-            node.status
-                .with_hits(0)
-                .with_wounds(node.status.wounds - counts[0]),
-            node.config,
-            probability * node.probability,
-        )
+    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
+        status
+            .with_hits(0)
+            .with_wounds(status.wounds - counts[0])
     }
 }
 
 impl Rule for SaveRule {
-    fn apply(&self, node: &CombatNode) -> Vec<CombatNode> {
-        TestRollRule::apply(self, node)
+    fn apply(
+        &self,
+        status: &CombatStatus,
+        probability: f64,
+        config: &CombatConfig,
+    ) -> Vec<(CombatStatus, f64)> {
+        TestRollRule::apply_distribution(self, status, probability, config)
     }
 }
 
@@ -199,43 +211,87 @@ pub struct DamagesRule;
 
 impl DamagesRule {
     fn _random_damages(roll: DiceRoll, num_wounds: u32) -> Vec<(u32, f64)> {
-        let rolls_probas = roll.values_and_probas();
-        let priors: Vec<f64> = rolls_probas.iter().map(|(_, proba)| *proba).collect();
-        let roll_values: Vec<u32> = rolls_probas.iter().map(|(value, _)| *value).collect();
-        let partitions = generate_partitions_probabilities(num_wounds, &priors);
-        partitions
+        // For each wound, damage is an independent draw from `roll`.
+        // Instead of enumerating all integer partitions (which becomes very
+        // expensive for large `num_wounds`), we compute the exact
+        // distribution of the sum via dynamic programming / convolution.
+
+        let n = num_wounds as usize;
+        if n == 0 {
+            return vec![(0, 1.0)];
+        }
+
+        let single = roll.values_and_probas();
+        // Maximum damage from a single wound
+        let max_single = single
             .iter()
-            .map(|(counts, proba)| {
-                (
-                    roll_values
-                        .iter()
-                        .zip(counts)
-                        .map(|(value, count)| value * count)
-                        .sum(),
-                    *proba,
-                )
+            .map(|(v, _)| *v as usize)
+            .max()
+            .unwrap_or(0);
+
+        if max_single == 0 {
+            return vec![(0, 1.0)];
+        }
+
+        let max_total = max_single * n;
+        let mut dist = vec![0.0_f64; max_total + 1];
+        dist[0] = 1.0;
+
+        for _ in 0..n {
+            let mut new_dist = vec![0.0_f64; max_total + 1];
+            for (sum, &p_sum) in dist.iter().enumerate() {
+                if p_sum == 0.0 {
+                    continue;
+                }
+                for (d, p_d) in &single {
+                    let new_sum = sum + *d as usize;
+                    if new_sum <= max_total {
+                        new_dist[new_sum] += p_sum * p_d;
+                    }
+                }
+            }
+            dist = new_dist;
+        }
+
+        let mut results: Vec<(u32, f64)> = dist
+            .iter()
+            .enumerate()
+            .filter_map(|(damage, &p)| {
+                if p > 0.0 {
+                    Some((damage as u32, p))
+                } else {
+                    None
+                }
             })
-            .collect()
+            .collect();
+
+        // Ensure a stable, ascending order (useful for callers/tests).
+        results.sort_by_key(|(d, _)| *d);
+        results
     }
 }
 
 impl Rule for DamagesRule {
-    fn apply(&self, node: &CombatNode) -> Vec<CombatNode> {
-        let num_wounds = node.status.wounds + node.status.mortal_wounds;
-        let damages_and_probas = match node.config.attack_stats.damages {
+    fn apply(
+        &self,
+        status: &CombatStatus,
+        probability: f64,
+        config: &CombatConfig,
+    ) -> Vec<(CombatStatus, f64)> {
+        let num_wounds = status.wounds + status.mortal_wounds;
+        let damages_and_probas = match config.attack_stats.damages {
             Characteristic::Value(value) => vec![(value * num_wounds, 1.0)],
             Characteristic::DiceRoll(roll) => DamagesRule::_random_damages(roll, num_wounds),
         };
         damages_and_probas
             .iter()
             .map(|(damages, proba)| {
-                CombatNode::new(
-                    node.status
+                (
+                    status
                         .with_mortal_wounds(0)
                         .with_wounds(0)
                         .with_damages(*damages),
-                    node.config,
-                    proba * node.probability,
+                    probability * proba,
                 )
             })
             .collect()
@@ -265,19 +321,20 @@ impl TestRollRule for WardRule {
         vec![success_proba, 1.0 - success_proba]
     }
 
-    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
-        CombatNode::new(
-            node.status.with_damages(node.status.damages - counts[0]),
-            node.config,
-            probability * node.probability,
-        )
+    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
+        status.with_damages(status.damages - counts[0])
     }
 }
 
 impl Rule for WardRule {
-    fn apply(&self, node: &CombatNode) -> Vec<CombatNode> {
-        if node.config.defense_stats.ward.is_some() {
-            TestRollRule::apply(self, node)
+    fn apply(
+        &self,
+        status: &CombatStatus,
+        probability: f64,
+        config: &CombatConfig,
+    ) -> Vec<(CombatStatus, f64)> {
+        if config.defense_stats.ward.is_some() {
+            TestRollRule::apply_distribution(self, status, probability, config)
         } else {
             vec![]
         }
@@ -300,14 +357,19 @@ impl TestRollRule for CritMortalWoundRule {
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
         BaseHitRule::partition_prior(self, config)
     }
-    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
-        BaseHitRule::build_node(self, node, counts, probability)
+    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
+        BaseHitRule::build_status(self, status, counts)
     }
 }
 
 impl Rule for CritMortalWoundRule {
-    fn apply(&self, node: &CombatNode) -> Vec<CombatNode> {
-        TestRollRule::apply(self, node)
+    fn apply(
+        &self,
+        status: &CombatStatus,
+        probability: f64,
+        config: &CombatConfig,
+    ) -> Vec<(CombatStatus, f64)> {
+        TestRollRule::apply_distribution(self, status, probability, config)
     }
 }
 
@@ -327,14 +389,19 @@ impl TestRollRule for CritAutoWoundRule {
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
         BaseHitRule::partition_prior(self, config)
     }
-    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
-        BaseHitRule::build_node(self, node, counts, probability)
+    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
+        BaseHitRule::build_status(self, status, counts)
     }
 }
 
 impl Rule for CritAutoWoundRule {
-    fn apply(&self, node: &CombatNode) -> Vec<CombatNode> {
-        TestRollRule::apply(self, node)
+    fn apply(
+        &self,
+        status: &CombatStatus,
+        probability: f64,
+        config: &CombatConfig,
+    ) -> Vec<(CombatStatus, f64)> {
+        TestRollRule::apply_distribution(self, status, probability, config)
     }
 }
 
@@ -354,14 +421,19 @@ impl TestRollRule for CritDoubleHitRule {
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
         BaseHitRule::partition_prior(self, config)
     }
-    fn build_node(&self, node: &CombatNode, counts: &[u32], probability: f64) -> CombatNode {
-        BaseHitRule::build_node(self, node, counts, probability)
+    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
+        BaseHitRule::build_status(self, status, counts)
     }
 }
 
 impl Rule for CritDoubleHitRule {
-    fn apply(&self, node: &CombatNode) -> Vec<CombatNode> {
-        TestRollRule::apply(self, node)
+    fn apply(
+        &self,
+        status: &CombatStatus,
+        probability: f64,
+        config: &CombatConfig,
+    ) -> Vec<(CombatStatus, f64)> {
+        TestRollRule::apply_distribution(self, status, probability, config)
     }
 }
 
@@ -369,7 +441,7 @@ impl Rule for CritDoubleHitRule {
 mod tests {
     use super::*;
     use crate::probabilities::combat_stats::{AttackStats, DefenseStats};
-    use crate::probabilities::combat_tree::compute_damages;
+    use crate::probabilities::compute_engine::compute_damages;
 
     /// Helper: build a CombatConfig with fixed-value attacks and damages.
     fn make_config(
@@ -589,9 +661,9 @@ mod tests {
     #[test]
     fn ward_rule_no_ward() {
         let config = make_config(1, 2, 2, 0, 1, 7, None);
-        let node = CombatNode::new(CombatStatus::new_with_values(0, 0, 0, 0, 1), config, 1.0);
         let ward_rule = WardRule;
-        let result = Rule::apply(&ward_rule, &node);
+        let status = CombatStatus::new_with_values(0, 0, 0, 0, 1);
+        let result = ward_rule.apply(&status, 1.0, &config);
         // When no ward is present, WardRule should return an empty vector
         assert_eq!(result.len(), 0);
     }

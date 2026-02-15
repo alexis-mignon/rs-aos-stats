@@ -1,11 +1,11 @@
-use crate::probabilities::rules::{
+use crate::probabilities::rules_impl::{
     AttackCharacteristicRule, CritAutoWoundRule, CritDoubleHitRule, CritMortalWoundRule,
     DamagesRule, HitRule, SaveRule, WardRule, WoundRule,
 };
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
-use crate::probabilities::combat_tree::Rule;
+use crate::probabilities::compute_engine::Rule;
 
 #[pyclass(name = "HitRule")]
 #[derive(Clone, Debug)]

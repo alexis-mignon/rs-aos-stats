@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 
-use crate::probabilities::combat_tree::{compute_damages, CombatConfig, Rule};
+use crate::probabilities::compute_engine::{compute_damages, CombatConfig, Rule};
 
 use super::rules::extract_rule;
 

@@ -165,12 +165,14 @@ def test_crit_rules_increase_damage():
 
     if all_pass:
         print("✅ ALL TESTS PASSED: All crit rules increase average damage")
-        return 0
     else:
         print("❌ SOME TESTS FAILED: Some crit rules do not increase damage")
-        return 1
+
+    # In pytest, signal failure via assertion instead of return value
+    assert all_pass, "Some crit rules did not increase average damage compared to normal hits"
 
 
 if __name__ == "__main__":
-    exit_code = test_crit_rules_increase_damage()
-    sys.exit(exit_code)
+    # When run directly, execute via pytest to honor assertions
+    import pytest
+    raise SystemExit(pytest.main([__file__]))

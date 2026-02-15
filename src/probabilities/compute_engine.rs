@@ -2,7 +2,7 @@ use crate::probabilities::combat_stats::{AttackStats, DefenseStats, RollModifier
 use std::collections::HashMap;
 use std::fmt;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CombatStatus {
     pub attacks: u32,
     pub hits: u32,
@@ -104,111 +104,67 @@ impl CombatConfig {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct CombatNode {
-    pub status: CombatStatus,
-    pub config: CombatConfig,
-    pub probability: f64,
-    pub children: Vec<CombatNode>,
-}
-
-impl CombatNode {
-    pub fn new(status: CombatStatus, config: CombatConfig, probability: f64) -> CombatNode {
-        CombatNode {
-            status,
-            config,
-            probability,
-            children: Vec::new(),
-        }
-    }
-
-    pub fn add_child(&mut self, node: CombatNode) {
-        self.children.push(node);
-    }
-
-    pub fn leaves(&self) -> Vec<&CombatNode> {
-        if self.children.is_empty() {
-            return vec![self];
-        }
-
-        let mut leaves = Vec::new();
-        for child in &self.children {
-            leaves.extend(child.leaves());
-        }
-        leaves
-    }
-
-    pub fn leaves_mut(&mut self) -> Vec<&mut CombatNode> {
-        if self.children.is_empty() {
-            return vec![self];
-        }
-
-        let mut leaves = Vec::new();
-        for child in self.children.iter_mut() {
-            leaves.extend(child.leaves_mut());
-        }
-        leaves
-    }
-
-    pub fn apply_rule(&mut self, rule: &dyn Rule) {
-        let children = rule.apply(self);
-        for child in children {
-            self.add_child(child)
-        }
-    }
-}
-
 pub trait Rule: fmt::Debug {
-    fn apply(&self, node: &CombatNode) -> Vec<CombatNode>;
+    fn apply(
+        &self,
+        status: &CombatStatus,
+        probability: f64,
+        config: &CombatConfig,
+    ) -> Vec<(CombatStatus, f64)>;
+}
+pub type CombatDist = HashMap<CombatStatus, f64>;
+
+/// Apply a single rule to a distribution of combat statuses
+fn apply_rule(
+    dist: &CombatDist,
+    config: CombatConfig,
+    rule: &dyn Rule,
+) -> CombatDist {
+    let mut new_dist: CombatDist = HashMap::new();
+
+    for (status, p) in dist.iter() {
+        let children = rule.apply(status, *p, &config);
+
+        for (child_status, child_p) in children {
+            *new_dist.entry(child_status).or_insert(0.0) += child_p;
+        }
+    }
+
+    new_dist
 }
 
-pub struct CombatTree {
-    root: CombatNode,
+/// Apply a full sequence of rules to an initial configuration and
+/// return the resulting distribution over combat statuses.
+pub fn apply_rules(config: CombatConfig, sequence: &Vec<Box<dyn Rule>>) -> CombatDist {
+    // Start with a single initial state
+    let mut dist: CombatDist = HashMap::new();
+    dist.insert(CombatStatus::new(), 1.0);
+
+    // Apply each rule iteratively, aggregating states with identical status
+    for rule in sequence {
+        dist = apply_rule(&dist, config, rule.as_ref());
+    }
+
+    dist
 }
 
-impl CombatTree {
-    pub fn new(config: CombatConfig) -> CombatTree {
-        CombatTree {
-            root: CombatNode::new(CombatStatus::new(), config, 1.0),
-        }
+/// Convert a distribution over combat statuses into a damage distribution
+/// by aggregating on the final damage value.
+pub fn damages_from_distribution(dist: &CombatDist) -> Vec<(u32, f64)> {
+    let mut damage_map: HashMap<u32, f64> = HashMap::new();
+    for (status, p) in dist.iter() {
+        *damage_map.entry(status.damages).or_insert(0.0) += p;
     }
 
-    pub fn build(&mut self, sequence: &Vec<Box<dyn Rule>>) {
-        for rule in sequence {
-            let leaves = self.root.leaves_mut();
-            for leaf in leaves {
-                leaf.apply_rule(rule.as_ref());
-            }
-        }
-    }
-
-    pub fn retrieve_damages_probas(&self) -> Vec<(u32, f64)> {
-        let damages_probas: Vec<(u32, f64)> = self
-            .root
-            .leaves()
-            .iter()
-            .map(|node| (node.status.damages, node.probability))
-            .collect();
-
-        let mut damages_proba_grouped = HashMap::new();
-        for (value, proba) in damages_probas {
-            let entry = damages_proba_grouped.entry(value).or_insert(0.0);
-            *entry += proba;
-        }
-
-        let mut damages_probas_vec: Vec<(u32, f64)> = damages_proba_grouped
-            .iter()
-            .map(|(value, proba)| (*value, *proba))
-            .collect();
-        damages_probas_vec.sort_by(|a, b| a.0.cmp(&b.0));
-        damages_probas_vec
-    }
+    let mut damages_probas_vec: Vec<(u32, f64)> =
+        damage_map.into_iter().map(|(d, p)| (d, p)).collect();
+    damages_probas_vec.sort_by(|a, b| a.0.cmp(&b.0));
+    damages_probas_vec
 }
 
 pub fn compute_damages(config: CombatConfig, sequence: &Vec<Box<dyn Rule>>) -> Vec<(u32, f64)> {
-    let mut tree = CombatTree::new(config);
-    tree.build(sequence);
-    tree.retrieve_damages_probas()
+    let dist = apply_rules(config, sequence);
+    damages_from_distribution(&dist)
 }
 
 #[cfg(test)]
@@ -286,33 +242,4 @@ mod tests {
         assert_eq!(config.modifier.to_wound, -1);
     }
 
-    /// Test CombatNode creation and child management.
-    #[test]
-    fn combat_node_children() {
-        let attack_stats =
-            AttackStats::new(Characteristic::Value(5), 3, 4, 1, Characteristic::Value(2));
-        let defense_stats = DefenseStats::new(5, None);
-        let config = CombatConfig::new(attack_stats, defense_stats);
-
-        let mut node = CombatNode::new(CombatStatus::new(), config, 1.0);
-        assert_eq!(node.children.len(), 0);
-
-        // Add a child
-        let child = CombatNode::new(CombatStatus::new(), config, 0.5);
-        node.add_child(child);
-        assert_eq!(node.children.len(), 1);
-    }
-
-    /// Test leaves() returns the node itself when there are no children.
-    #[test]
-    fn combat_node_leaves_no_children() {
-        let attack_stats =
-            AttackStats::new(Characteristic::Value(5), 3, 4, 1, Characteristic::Value(2));
-        let defense_stats = DefenseStats::new(5, None);
-        let config = CombatConfig::new(attack_stats, defense_stats);
-
-        let node = CombatNode::new(CombatStatus::new(), config, 1.0);
-        let leaves = node.leaves();
-        assert_eq!(leaves.len(), 1);
-    }
 }

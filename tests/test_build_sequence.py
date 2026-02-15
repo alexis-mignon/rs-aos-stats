@@ -95,7 +95,8 @@ def test_build_standard_sequence():
 
     print("\n" + "=" * 70)
     print("All tests passed!")
-    return True
+
+    # In pytest, simply return None and let assertions control success
 
 
 if __name__ == "__main__":

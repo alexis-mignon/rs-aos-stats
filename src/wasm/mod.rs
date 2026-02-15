@@ -1,7 +1,7 @@
 use crate::probabilities::combat_stats::{AttackStats, Characteristic, DefenseStats};
-use crate::probabilities::combat_tree::{compute_damages, CombatConfig, Rule};
+use crate::probabilities::compute_engine::{compute_damages, CombatConfig, Rule};
 use crate::probabilities::dice::DiceRoll;
-use crate::probabilities::rules::*;
+use crate::probabilities::rules_impl::*;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 

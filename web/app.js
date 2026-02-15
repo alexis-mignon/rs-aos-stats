@@ -381,82 +381,79 @@ function updateChart(result) {
     gradient.addColorStop(0, 'rgba(102, 126, 234, 0.8)');
     gradient.addColorStop(1, 'rgba(118, 75, 162, 0.2)');
 
+    // Always recreate the chart to ensure axes and bars fully refresh
     if (chart) {
-        // Update existing chart
-        chart.data.labels = labels;
-        chart.data.datasets[0].data = data;
-        chart.update();
-    } else {
-        // Create new chart
-        chart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Probability (%)',
-                    data: data,
-                    backgroundColor: gradient,
-                    borderColor: 'rgba(102, 126, 234, 1)',
-                    borderWidth: 2,
-                    borderRadius: 5,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    title: {
-                        display: true,
-                        text: 'Damage Probability Distribution',
-                        font: {
-                            size: 18,
-                            weight: 'bold'
-                        },
-                        color: '#333'
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return `Probability: ${context.parsed.y.toFixed(2)}%`;
-                            }
-                        }
-                    }
+        chart.destroy();
+    }
+
+    chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Probability (%)',
+                data: data,
+                backgroundColor: gradient,
+                borderColor: 'rgba(102, 126, 234, 1)',
+                borderWidth: 2,
+                borderRadius: 5,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Probability (%)',
-                            font: {
-                                size: 14,
-                                weight: 'bold'
-                            }
-                        },
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.05)'
-                        }
+                title: {
+                    display: true,
+                    text: 'Damage Probability Distribution',
+                    font: {
+                        size: 18,
+                        weight: 'bold'
                     },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Damage',
-                            font: {
-                                size: 14,
-                                weight: 'bold'
-                            }
-                        },
-                        grid: {
-                            display: false
+                    color: '#333'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Probability: ${context.parsed.y.toFixed(2)}%`;
                         }
                     }
                 }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Probability (%)',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Damage',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
             }
-        });
-    }
+        }
+    });
 }
 
 // Initialize when the page loads
