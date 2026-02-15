@@ -1,3 +1,8 @@
+/// Python wrappers for the Rust rule implementations.
+///
+/// Each `*RulePy` class is a thin shell around the corresponding
+/// Rust type in `rules_impl`, allowing Python to build rule sequences
+/// that plug directly into the DP engine.
 use crate::probabilities::rules_impl::{
     AttackCharacteristicRule, CritAutoWoundRule, CritDoubleHitRule, CritMortalWoundRule,
     DamagesRule, HitRule, SaveRule, WardRule, WoundRule,

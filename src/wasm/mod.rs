@@ -1,3 +1,7 @@
+/// WebAssembly-facing façade over the Rust probability engine.
+///
+/// Functions in this module are called from the JavaScript front-end to
+/// compute exact damage distributions for given combat parameters.
 use crate::probabilities::combat_stats::{AttackStats, Characteristic, DefenseStats};
 use crate::probabilities::compute_engine::{compute_damages, CombatConfig, Rule};
 use crate::probabilities::dice::DiceRoll;

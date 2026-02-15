@@ -1,6 +1,12 @@
 use crate::probabilities::dice::DiceRoll;
 use std::ops::{Add, AddAssign};
 
+/// Core attack/defense statistics and roll modifiers used by the
+/// probability engine.
+///
+/// These types describe the AoS profile (attacks, to-hit, to-wound,
+/// rend, save, ward) and how modifiers affect dice rolls; they do not
+/// perform any stateful computation themselves.
 #[derive(Clone, Copy, Debug)]
 pub enum Characteristic {
     Value(u32),

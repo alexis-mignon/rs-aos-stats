@@ -5,7 +5,11 @@ use crate::probabilities::partitions::generate_partitions_probabilities;
 
 #[derive(Clone, Debug)]
 pub struct AttackCharacteristicRule;
-/// Dertmines the number of attacks
+/// Determines the number of attacks for the current profile.
+///
+/// If the characteristic is a fixed value we just forward it, otherwise
+/// we expand the dice expression into an exact `(value, probability)`
+/// distribution and branch the combat state accordingly.
 impl Rule for AttackCharacteristicRule {
     fn apply(
         &self,
@@ -32,11 +36,27 @@ impl Rule for AttackCharacteristicRule {
     }
 }
 
+/// Shared helper for rules that can be modelled as "roll N identical dice
+/// and classify each roll into a small number of outcome buckets".
+///
+/// Examples: hit/wound/save tests, ward saves, and crit variants.
+/// All of them only depend on the number of rolls, the per-roll outcome
+/// probabilities and on how the final bucket counts update `CombatStatus`.
 pub trait TestRollRule: Rule {
     fn roll_count(&self, status: &CombatStatus) -> u32;
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64>;
     fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus;
 
+    /// Apply the multinomial distribution induced by this rule to a single
+    /// `(CombatStatus, probability)` state.
+    ///
+    /// - `partition_prior` gives the probability of each outcome bucket for
+    ///   one die (e.g. `[P(crit), P(normal hit), P(miss)]`).
+    /// - `roll_count` says how many dice we roll.
+    /// - `generate_partitions_probabilities` then enumerates all possible
+    ///   bucket count vectors and their multinomial probabilities.
+    /// - For each such partition we build a new `CombatStatus` and scale the
+    ///   current state probability accordingly.
     fn apply_distribution(
         &self,
         status: &CombatStatus,
@@ -55,12 +75,20 @@ pub trait TestRollRule: Rule {
     }
 }
 
+/// Base implementation for hit-like rules with three outcome buckets:
+/// critical hit, normal hit and failure.
+///
+/// Concrete rules only need to decide how the partition counts map to
+/// `(hits, wounds, mortal_wounds)` via `result`.
 pub trait BaseHitRule: TestRollRule {
     fn roll_count(&self, status: &CombatStatus) -> u32 {
         status.attacks
     }
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
-        // Compute the probability of success
+        // Per-roll probabilities for the three buckets:
+        //  - index 0: critical hits (natural 6)
+        //  - index 1: normal successful hits (meeting to-hit after modifiers)
+        //  - index 2: failures.
 
         let critical_proba = 1.0 / 6.0;
         let success_proba = (1..=6)
@@ -135,6 +163,9 @@ impl TestRollRule for WoundRule {
         status.hits
     }
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
+        // Two buckets for each wound roll:
+        //  - index 0: successful wounds
+        //  - index 1: failed wounds.
         let success_proba = (1..=6)
             .map(|roll| match roll {
                 1 => 0.0,
@@ -174,6 +205,9 @@ impl TestRollRule for SaveRule {
         status.wounds
     }
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
+        // Two buckets for each save roll:
+        //  - index 0: successful saves
+        //  - index 1: failed saves (become unsaved wounds).
         let success_proba = (1..=6)
             .map(|roll| match roll {
                 1 => 0.0,
@@ -212,9 +246,12 @@ pub struct DamagesRule;
 impl DamagesRule {
     fn _random_damages(roll: DiceRoll, num_wounds: u32) -> Vec<(u32, f64)> {
         // For each wound, damage is an independent draw from `roll`.
-        // Instead of enumerating all integer partitions (which becomes very
-        // expensive for large `num_wounds`), we compute the exact
-        // distribution of the sum via dynamic programming / convolution.
+        //
+        // If we have `num_wounds` such draws, the total damage is the sum of
+        // `num_wounds` i.i.d. variables. We compute the exact distribution of
+        // this sum by repeated convolution of the single-wound distribution
+        // instead of enumerating all integer partitions, which would be
+        // combinatorially expensive for large `num_wounds`.
 
         let n = num_wounds as usize;
         if n == 0 {
@@ -311,6 +348,9 @@ impl TestRollRule for WardRule {
             .defense_stats
             .ward
             .expect("WardRule requires ward save to be set");
+        // Two buckets for each ward roll:
+        //  - index 0: successful ward (damage prevented)
+        //  - index 1: failed ward (damage goes through).
         let success_proba = (1..=6)
             .map(|roll| match roll {
                 1 => 0.0,
@@ -346,6 +386,8 @@ pub struct CritMortalWoundRule;
 
 impl BaseHitRule for CritMortalWoundRule {
     fn result(&self, partition: &[u32]) -> (u32, u32, u32) {
+        // `partition[0]` = crits, `partition[1]` = normal hits.
+        // Crits become mortal wounds, normal hits stay as hits.
         (partition[1], 0, partition[0])
     }
 }
@@ -378,6 +420,8 @@ pub struct CritAutoWoundRule;
 
 impl BaseHitRule for CritAutoWoundRule {
     fn result(&self, partition: &[u32]) -> (u32, u32, u32) {
+        // `partition[0]` = crits, `partition[1]` = normal hits.
+        // Crits skip the wound roll and go straight to the wound pool.
         (partition[1], partition[0], 0)
     }
 }
@@ -410,6 +454,8 @@ pub struct CritDoubleHitRule;
 
 impl BaseHitRule for CritDoubleHitRule {
     fn result(&self, partition: &[u32]) -> (u32, u32, u32) {
+        // `partition[0]` = crits, `partition[1]` = normal hits.
+        // Crits count as two hits each.
         (2 * partition[0] + partition[1], 0, 0)
     }
 }

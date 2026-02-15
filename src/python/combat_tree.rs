@@ -1,5 +1,9 @@
 use pyo3::prelude::*;
 
+/// Python-facing bindings for the dynamic-programming combat engine.
+///
+/// This exposes `CombatConfig` and `compute_damages` to Python code,
+/// which is used by the API tests and higher-level helpers.
 use crate::probabilities::compute_engine::{compute_damages, CombatConfig, Rule};
 
 use super::rules::extract_rule;

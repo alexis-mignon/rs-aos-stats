@@ -95,6 +95,18 @@ make demo          # Tout en un
 - `web/` : Application web interactive
 - `examples/` : Exemples d'utilisation (Jupyter notebooks, scripts Python)
 
+## Vue d'ensemble du moteur de calcul
+
+Le calcul des dégâts suit un pipeline clair :
+
+- **Stats → Config** : les profils d'attaque/défense (AttackStats, DefenseStats, RollModifier) sont combinés dans un `CombatConfig`.
+- **Règles** : une séquence de règles (HitRule, WoundRule, SaveRule, DamagesRule, WardRule, variantes de critiques, etc.) décrit l’ordre des étapes AoS.
+- **Moteur DP** : le module `src/probabilities/compute_engine.rs` maintient une distribution exacte sur les états de combat (`CombatStatus`) et applique chaque règle de manière itérative en agrégeant les probabilités (pas de simulation, pas d’arbre explicite).
+- **Résultat** : la distribution finale est marginalisée sur le champ `damages` pour produire une distribution `(dégâts, probabilité)`.
+- **Bindings** : 
+    - `src/python/` expose `CombatConfig` + `compute_damages` et des wrappers de règles pour Python / API.
+    - `src/wasm/` expose des fonctions WASM utilisées par `web/app.js` pour la démo interactive.
+
 ## Développement
 
 ### Configuration des pre-commit hooks

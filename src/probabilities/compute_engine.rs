@@ -2,6 +2,12 @@ use crate::probabilities::combat_stats::{AttackStats, DefenseStats, RollModifier
 use std::collections::HashMap;
 use std::fmt;
 
+/// Snapshot of the combat pipeline at a given step.
+///
+/// The rules in `rules_impl` transform this struct: starting from all
+/// counters at zero, each rule consumes some fields (e.g. `attacks` or
+/// `wounds`) and produces others (e.g. `hits`, `mortal_wounds`, `damages`).
+/// The engine tracks a probability distribution over these statuses.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CombatStatus {
     pub attacks: u32,
@@ -75,6 +81,7 @@ impl Default for CombatStatus {
     }
 }
 
+/// Static configuration for a combat profile (stats + modifiers).
 #[derive(Clone, Copy, Debug)]
 pub struct CombatConfig {
     pub attack_stats: AttackStats,
@@ -104,6 +111,12 @@ impl CombatConfig {
     }
 }
 
+/// A single step in the combat sequence.
+///
+/// Given an input `(CombatStatus, probability)` and the immutable
+/// `CombatConfig`, a rule branches into zero or more successor states
+/// with associated probabilities. The engine is responsible for
+/// aggregating identical `CombatStatus` values across branches.
 pub trait Rule: fmt::Debug {
     fn apply(
         &self,
@@ -114,7 +127,9 @@ pub trait Rule: fmt::Debug {
 }
 pub type CombatDist = HashMap<CombatStatus, f64>;
 
-/// Apply a single rule to a distribution of combat statuses
+/// Apply a single rule to a distribution of combat statuses, returning the
+/// new distribution. States that end up with identical `CombatStatus`
+/// are merged by summing their probabilities.
 fn apply_rule(
     dist: &CombatDist,
     config: CombatConfig,
@@ -135,6 +150,11 @@ fn apply_rule(
 
 /// Apply a full sequence of rules to an initial configuration and
 /// return the resulting distribution over combat statuses.
+///
+/// Conceptually this performs a dynamic-programming traversal of all
+/// possible outcomes without building an explicit tree: we iteratively
+/// push the probability mass through each rule and coalesce identical
+/// states at every step.
 pub fn apply_rules(config: CombatConfig, sequence: &Vec<Box<dyn Rule>>) -> CombatDist {
     // Start with a single initial state
     let mut dist: CombatDist = HashMap::new();
@@ -148,8 +168,8 @@ pub fn apply_rules(config: CombatConfig, sequence: &Vec<Box<dyn Rule>>) -> Comba
     dist
 }
 
-/// Convert a distribution over combat statuses into a damage distribution
-/// by aggregating on the final damage value.
+/// Convert a distribution over combat statuses into a marginal damage
+/// distribution by aggregating on the `damages` field only.
 pub fn damages_from_distribution(dist: &CombatDist) -> Vec<(u32, f64)> {
     let mut damage_map: HashMap<u32, f64> = HashMap::new();
     for (status, p) in dist.iter() {
