@@ -17,6 +17,7 @@ Une bibliothèque Rust pour calculer les probabilités de dégâts dans Warhamme
 - **Règles de combat complètes** : Support des hits, wounds, saves, wards, et règles spéciales
 - **Règles de critiques** : Auto-wound, mortal wounds, double hits
 - **Bindings Python** : Utilisable depuis Python avec PyO3
+- **API REST (FastAPI)** : Endpoint HTTP pour calculer les distributions de dégâts
 - **Démo WebAssembly** : Application web interactive pour visualiser les distributions de dégâts
 
 ## Utilisation
@@ -57,6 +58,29 @@ make open          # Ouvrir le navigateur
 
 Voir [web/README.md](web/README.md) pour plus de détails.
 
+### API REST
+
+Une API FastAPI est disponible dans le dossier `api/`.
+
+Pour la lancer :
+
+```bash
+# Installer les dépendances API
+.venv/bin/pip install -r api/requirements.txt
+
+# Construire le module Python Rust
+.venv/bin/maturin develop
+
+# Lancer le serveur API
+.venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8001
+```
+
+Documentation interactive :
+- Swagger UI : `http://localhost:8001/docs`
+- ReDoc : `http://localhost:8001/redoc`
+
+Voir [api/README.md](api/README.md) pour la spécification complète de l'API (schémas, validations, exemples `curl`).
+
 ## Installation
 
 ### Pour Python
@@ -82,6 +106,7 @@ make demo          # Tout en un
 - `src/probabilities/` : Logique de calcul des probabilités (core)
 - `src/python/` : Bindings Python avec PyO3
 - `src/wasm/` : Bindings WebAssembly avec wasm-bindgen
+- `api/` : API REST FastAPI et documentation OpenAPI
 - `web/` : Application web interactive
 - `examples/` : Exemples d'utilisation (Jupyter notebooks, scripts Python)
 
