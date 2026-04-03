@@ -1,7 +1,7 @@
 import pytest
 from rs_aos_stats import (
-    HitRule, WoundRule, SaveRule, DamagesRule, AttackCharacteristicRule,
-    WardRule, CritAutoWoundRule, CritMortalWoundRule, CritDoubleHitRule,
+    HitRule, WoundRule, SaveRule, DamagesRule, WardRule, CritAutoWoundRule,
+    CritMortalWoundRule, CritDoubleHitRule,
 )
 
 ALL_RULE_CLASSES = [
@@ -9,7 +9,6 @@ ALL_RULE_CLASSES = [
     WoundRule,
     SaveRule,
     DamagesRule,
-    AttackCharacteristicRule,
     WardRule,
     CritAutoWoundRule,
     CritMortalWoundRule,
@@ -26,6 +25,6 @@ class TestRules:
         rule = rule_cls()
         assert rule is not None
 
-    def test_all_nine_rule_types(self):
-        """There should be exactly 9 rule types."""
-        assert len(ALL_RULE_CLASSES) == 9
+    def test_all_eight_rule_types(self):
+        """There should be exactly 8 exposed rule types."""
+        assert len(ALL_RULE_CLASSES) == 8

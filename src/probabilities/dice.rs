@@ -1,7 +1,10 @@
 use regex::Regex;
-use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
+
+use crate::probabilities::convolution::convolve_n;
+
+pub(crate) const MAX_DICE_COUNT: u32 = 50;
 
 #[derive(Debug, Clone, Copy)]
 pub enum DiceRoll {
@@ -18,61 +21,45 @@ pub enum DiceRoll {
 impl DiceRoll {
     pub fn values_and_probas(&self) -> Vec<(u32, f64)> {
         match self {
-            DiceRoll::D6 => (1..=6).map(|x| (x, 1.0 / 6.0)).collect(),
-            DiceRoll::D3 => (1..=3).map(|x| (x, 1.0 / 3.0)).collect(),
-            DiceRoll::D6Plus(n) => (1..=6).map(|x| (x + n, 1.0 / 6.0)).collect(),
-            DiceRoll::D3Plus(n) => (1..=3).map(|x| (x + n, 1.0 / 3.0)).collect(),
-            DiceRoll::ND6(n) => _generate_dice_rolls(*n as usize, 6),
-            DiceRoll::ND3(n) => _generate_dice_rolls(*n as usize, 3),
-            DiceRoll::ND3Plus(n, m) => _generate_dice_rolls(*n as usize, 3)
-                .iter()
-                .map(|(x, proba)| (*x + m, *proba))
-                .collect(),
-            DiceRoll::ND6Plus(n, m) => _generate_dice_rolls(*n as usize, 6)
-                .iter()
-                .map(|(x, proba)| (*x + m, *proba))
-                .collect(),
+            DiceRoll::D6 => single_die_distribution(6),
+            DiceRoll::D3 => single_die_distribution(3),
+            DiceRoll::D6Plus(n) => shift_distribution(&single_die_distribution(6), *n),
+            DiceRoll::D3Plus(n) => shift_distribution(&single_die_distribution(3), *n),
+            DiceRoll::ND6(n) => generate_dice_sum_distribution(*n, 6),
+            DiceRoll::ND3(n) => generate_dice_sum_distribution(*n, 3),
+            DiceRoll::ND3Plus(n, m) => {
+                shift_distribution(&generate_dice_sum_distribution(*n, 3), *m)
+            }
+            DiceRoll::ND6Plus(n, m) => {
+                shift_distribution(&generate_dice_sum_distribution(*n, 6), *m)
+            }
         }
     }
 }
 
-fn _generate_dice_rolls(n_dices: usize, n_faces: u32) -> Vec<(u32, f64)> {
-    let mut rolls = Vec::new();
-    _generate_dice_rolls_recursive(n_dices, n_faces, 0, 0, &mut rolls);
-
-    let roll_counts: HashMap<u32, u32> = rolls.iter().fold(HashMap::new(), |mut acc, roll| {
-        *acc.entry(*roll).or_insert(0) += 1;
-        acc
-    });
-
-    let proba_n_dice_rolls = 1.0 / (n_faces.pow(n_dices as u32) as f64);
-    roll_counts
-        .iter()
-        .map(|(roll, count)| (*roll, *count as f64 * proba_n_dice_rolls))
-        .collect()
+fn single_die_distribution(n_faces: u32) -> Vec<(u32, f64)> {
+    match n_faces {
+        3 => (1..=3).map(|value| (value, 1.0 / 3.0)).collect(),
+        6 => (1..=6).map(|value| (value, 1.0 / 6.0)).collect(),
+        _ => unreachable!("unsupported face count: {n_faces}"),
+    }
 }
 
-fn _generate_dice_rolls_recursive(
-    n_dices: usize,
-    n_faces: u32,
-    current_dice_index: usize,
-    current_roll: u32,
-    rolls: &mut Vec<u32>,
-) {
-    if current_dice_index == n_dices {
-        rolls.push(current_roll);
-        return;
-    }
+fn generate_dice_sum_distribution(n_dices: u32, n_faces: u32) -> Vec<(u32, f64)> {
+    assert!(
+        n_dices <= MAX_DICE_COUNT,
+        "dice count {} exceeds maximum of {}",
+        n_dices,
+        MAX_DICE_COUNT
+    );
+    let single_die = single_die_distribution(n_faces);
+    convolve_n(&single_die, n_dices)
+}
 
-    for i in 1..=n_faces {
-        _generate_dice_rolls_recursive(
-            n_dices,
-            n_faces,
-            current_dice_index + 1,
-            current_roll + i,
-            rolls,
-        );
-    }
+fn shift_distribution(dist: &[(u32, f64)], offset: u32) -> Vec<(u32, f64)> {
+    dist.iter()
+        .map(|(value, probability)| (*value + offset, *probability))
+        .collect()
 }
 
 impl DiceRoll {
@@ -83,11 +70,22 @@ impl DiceRoll {
     }
 }
 
+pub(crate) fn validate_dice_count(n_dices: u32) -> Result<(), DiceRollParseError> {
+    if n_dices > MAX_DICE_COUNT {
+        Err(DiceRollParseError::TooManyDice {
+            count: n_dices,
+            max: MAX_DICE_COUNT,
+        })
+    } else {
+        Ok(())
+    }
+}
+
 impl FromStr for DiceRoll {
     type Err = DiceRollParseError;
 
     fn from_str(dice_str: &str) -> Result<DiceRoll, DiceRollParseError> {
-        let re = Regex::new(r"(?<n>\d+)?D(?<faces>[36])(\+(?<bonus>\d+))?")
+        let re = Regex::new(r"^(?<n>[1-9]\d*)?D(?<faces>[36])(?:\+(?<bonus>\d+))?$")
             .map_err(|_| DiceRollParseError::InvalidRegex)?;
 
         if let Some(captures) = re.captures(dice_str) {
@@ -101,6 +99,8 @@ impl FromStr for DiceRoll {
             let bonus = captures
                 .name("bonus")
                 .map_or(0, |m| m.as_str().parse().unwrap());
+
+            validate_dice_count(n)?;
 
             if n == 1 {
                 match faces {
@@ -138,11 +138,19 @@ pub enum DiceRollParseError {
     InvalidRegex,
     InvalidFaceNumber,
     InvalidFormat,
+    TooManyDice { count: u32, max: u32 },
 }
 
 impl fmt::Display for DiceRollParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            DiceRollParseError::InvalidRegex => write!(f, "InvalidRegex"),
+            DiceRollParseError::InvalidFaceNumber => write!(f, "InvalidFaceNumber"),
+            DiceRollParseError::InvalidFormat => write!(f, "InvalidFormat"),
+            DiceRollParseError::TooManyDice { count, max } => {
+                write!(f, "dice count {count} exceeds maximum of {max}")
+            }
+        }
     }
 }
 
@@ -190,6 +198,33 @@ mod tests {
     fn parse_invalid() {
         let result = DiceRoll::from_str("invalid");
         assert!(result.is_err());
+    }
+
+    /// Strings must match the dice notation exactly; extra characters or
+    /// zero-count dice are invalid.
+    #[test]
+    fn parse_rejects_malformed_strings() {
+        for invalid in ["xD6", "D6junk", "2D6foo", "D3+2x", "0D6"] {
+            assert!(DiceRoll::from_str(invalid).is_err());
+        }
+    }
+
+    /// The dice parser rejects more than 50 dice in a single notation.
+    #[test]
+    fn parse_rejects_too_many_dice() {
+        for invalid in ["51D6", "51D3+1"] {
+            assert!(matches!(
+                DiceRoll::from_str(invalid),
+                Err(DiceRollParseError::TooManyDice { .. })
+            ));
+        }
+    }
+
+    /// The upper bound still allows exactly 50 dice.
+    #[test]
+    fn parse_accepts_fifty_dice() {
+        let roll = DiceRoll::from_str("50D6").unwrap();
+        assert!(matches!(roll, DiceRoll::ND6(50)));
     }
 
     /// A D6 should yield exactly 6 outcomes, each with probability 1/6,
@@ -286,6 +321,21 @@ mod tests {
         let vp = roll.values_and_probas();
         // Range should be [3, 13] (2d6 gives 2-12, +1 = 3-13)
         assert!(vp.iter().all(|(v, _)| *v >= 3 && *v <= 13));
+        let total: f64 = vp.iter().map(|(_, p)| p).sum();
+        assert!((total - 1.0).abs() < 1e-10);
+    }
+
+    /// Larger dice pools should be computed via convolution rather than
+    /// recursive expansion, while preserving the exact range and mass.
+    #[test]
+    fn nd6_large_pool_probabilities() {
+        let roll = DiceRoll::ND6(10);
+        let vp = roll.values_and_probas();
+
+        assert_eq!(vp.first().unwrap().0, 10);
+        assert_eq!(vp.last().unwrap().0, 60);
+        assert_eq!(vp.len(), 51);
+
         let total: f64 = vp.iter().map(|(_, p)| p).sum();
         assert!((total - 1.0).abs() < 1e-10);
     }

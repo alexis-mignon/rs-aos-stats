@@ -1,12 +1,7 @@
 use pyo3::prelude::*;
 
-/// Python-facing bindings for the dynamic-programming combat engine.
-///
-/// This exposes `CombatConfig` and `compute_damages` to Python code,
-/// which is used by the API tests and higher-level helpers.
-use crate::probabilities::compute_engine::{compute_damages, CombatConfig, Rule};
-
-use super::rules::extract_rule;
+use crate::probabilities::compute_engine::CombatConfig;
+use crate::probabilities::rules_impl::{compute_damages, HitRuleVariant};
 
 use super::combat_stats::{AttackStatsPy, DefenseStatsPy, RollModifierPy};
 
@@ -50,11 +45,10 @@ impl From<CombatConfigPy> for CombatConfig {
 #[pyfunction(name = "compute_damages")]
 pub fn compute_damages_py(
     config: CombatConfigPy,
-    sequence: Vec<Bound<'_, PyAny>>,
+    hit_rule_type: &str,
 ) -> PyResult<Vec<(u32, f64)>> {
-    let rule_sequence: Vec<Box<dyn Rule>> = sequence
-        .iter()
-        .map(|rule| extract_rule(rule))
-        .collect::<PyResult<Vec<_>>>()?;
-    Ok(compute_damages(config.into(), &rule_sequence))
+    let variant: HitRuleVariant = hit_rule_type
+        .parse()
+        .map_err(|e: String| pyo3::exceptions::PyValueError::new_err(e))?;
+    Ok(compute_damages(config.into(), variant))
 }

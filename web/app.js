@@ -63,9 +63,9 @@ function setupEventListeners() {
             nRow.style.display = 'block';
             mRow.style.display = 'block';
             attacksN.min = 1;
-            attacksN.max = 4;
-            if (parseInt(attacksN.value, 10) > 4) {
-                attacksN.value = 4;
+            attacksN.max = 50;
+            if (parseInt(attacksN.value, 10) > 50) {
+                attacksN.value = 50;
             }
             nLabel.innerHTML = 'N (multiplier): <span class="value-display" id="attacks-n-value">' + attacksN.value + '</span>';
         }
@@ -96,9 +96,9 @@ function setupEventListeners() {
             nRow.style.display = 'block';
             mRow.style.display = 'block';
             damageN.min = 1;
-            damageN.max = 4;
-            if (parseInt(damageN.value, 10) > 4) {
-                damageN.value = 4;
+            damageN.max = 50;
+            if (parseInt(damageN.value, 10) > 50) {
+                damageN.value = 50;
             }
             nLabel.innerHTML = 'N (multiplier): <span class="value-display" id="damage-n-value">' + damageN.value + '</span>';
         }
@@ -191,9 +191,9 @@ function initializeControlVisibility() {
         attacksMRow.style.display = 'block';
         const attacksNInput = document.getElementById('attacks-n');
         attacksNInput.min = 1;
-        attacksNInput.max = 4;
-        if (parseInt(attacksNInput.value, 10) > 4) {
-            attacksNInput.value = 4;
+        attacksNInput.max = 50;
+        if (parseInt(attacksNInput.value, 10) > 50) {
+            attacksNInput.value = 50;
         }
         attacksNLabel.innerHTML = 'N (multiplier): <span class="value-display" id="attacks-n-value">' + attacksNInput.value + '</span>';
     }
@@ -218,9 +218,9 @@ function initializeControlVisibility() {
         damageMRow.style.display = 'block';
         const damageNInput = document.getElementById('damage-n');
         damageNInput.min = 1;
-        damageNInput.max = 4;
-        if (parseInt(damageNInput.value, 10) > 4) {
-            damageNInput.value = 4;
+        damageNInput.max = 50;
+        if (parseInt(damageNInput.value, 10) > 50) {
+            damageNInput.value = 50;
         }
         damageNLabel.innerHTML = 'N (multiplier): <span class="value-display" id="damage-n-value">' + damageNInput.value + '</span>';
     }

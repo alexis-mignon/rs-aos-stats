@@ -17,7 +17,23 @@ dev = [
     "pre-commit",
     "pytest",
     "hypothesis",
+    "ruff",
+    "mypy",
 ]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_configs = true
+files = ["api", "tests"]

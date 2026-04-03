@@ -195,6 +195,20 @@ class TestMathematicalProperties:
         assert abs(expected_value - 7.0) < 1e-9, \
             f"2D6 expected value should be 7.0, got {expected_value}"
 
+    def test_expected_value_10d6(self):
+        """10D6 should remain exact and have expected value of 35."""
+        dice = rs.ND6(10)
+        results = dice.values_and_probas()
+
+        values = [v for v, _ in results]
+        expected_value = sum(v * p for v, p in results)
+
+        assert min(values) == 10, "10D6 minimum should be 10"
+        assert max(values) == 60, "10D6 maximum should be 60"
+        assert abs(sum(p for _, p in results) - 1.0) < 1e-9, "10D6 probabilities should sum to 1"
+        assert abs(expected_value - 35.0) < 1e-9, \
+            f"10D6 expected value should be 35.0, got {expected_value}"
+
     def test_nd6_not_equal_to_nd3(self):
         """Regression test: ND6 should NOT produce ND3 results."""
         nd6 = rs.ND6(2)

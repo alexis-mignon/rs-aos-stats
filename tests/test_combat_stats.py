@@ -25,10 +25,16 @@ class TestCharacteristic:
         with pytest.raises(BaseException):
             Characteristic([1, 2, 3])
 
-    def test_from_invalid_str(self):
-        """Characteristic("invalid") should raise."""
+    def test_from_negative_int(self):
+        """Characteristic should reject negative integer values."""
+        with pytest.raises(ValueError):
+            Characteristic(-1)
+
+    @pytest.mark.parametrize("value", ["invalid", "xD6", "D6junk", "D3+2x", "51D6"])
+    def test_from_invalid_str(self, value):
+        """Characteristic should reject malformed dice strings."""
         with pytest.raises(BaseException):
-            Characteristic("invalid")
+            Characteristic(value)
 
 
 class TestAttackStats:
@@ -53,6 +59,21 @@ class TestAttackStats:
         """AttackStats with invalid attacks value should raise."""
         with pytest.raises(BaseException):
             AttackStats([1, 2], 3, 3, 1, 1)
+
+    @pytest.mark.parametrize(
+        "attacks,to_hit,to_wound,rend,damages",
+        [
+            (-1, 3, 3, 1, 1),
+            (1, -1, 3, 1, 1),
+            (1, 3, -1, 1, 1),
+            (1, 3, 3, -1, 1),
+            (1, 3, 3, 1, -1),
+        ],
+    )
+    def test_new_with_negative_values(self, attacks, to_hit, to_wound, rend, damages):
+        """AttackStats should reject negative numeric inputs."""
+        with pytest.raises(ValueError):
+            AttackStats(attacks, to_hit, to_wound, rend, damages)
 
 
 class TestDefenseStats:

@@ -26,7 +26,6 @@ Une bibliothèque Rust pour calculer les probabilités de dégâts dans Warhamme
 ```python
 from rs_aos_stats import (
     AttackStats, DefenseStats, CombatConfig, compute_damages,
-    HitRule, WoundRule, SaveRule, DamagesRule, WardRule
 )
 
 # Configurer les stats
@@ -34,17 +33,8 @@ attack_stats = AttackStats(attacks=10, to_hit=3, to_wound=3, rend=1, damage=1)
 defense_stats = DefenseStats(save=4, ward=None)
 config = CombatConfig(attack_stats, defense_stats, None)
 
-# Définir la séquence de règles
-sequence = [
-    AttackCharacteristicRule(),
-    HitRule(),
-    WoundRule(),
-    SaveRule(),
-    DamagesRule(),
-]
-
 # Calculer les dégâts
-damages = compute_damages(config, sequence)
+damages = compute_damages(config, "normal")
 for damage, probability in damages:
     print(f"{damage} dégâts: {probability:.2%}")
 ```
@@ -100,10 +90,11 @@ make demo          # Tout en un
 Le calcul des dégâts suit un pipeline clair :
 
 - **Stats → Config** : les profils d'attaque/défense (AttackStats, DefenseStats, RollModifier) sont combinés dans un `CombatConfig`.
-- **Règles** : une séquence de règles (HitRule, WoundRule, SaveRule, DamagesRule, WardRule, variantes de critiques, etc.) décrit l’ordre des étapes AoS.
-- **Moteur DP** : le module `src/probabilities/compute_engine.rs` maintient une distribution exacte sur les états de combat (`CombatStatus`) et applique chaque règle de manière itérative en agrégeant les probabilités (pas de simulation, pas d’arbre explicite).
+- **Règles** : un `PipelineBuilder` typé enchaîne les règles de transition d'une attaque individuelle (`Initial` → `Hit` → `Wounded` → `Saved` → `Damaged`), avec vérification à la compilation de l’ordre correct.
+- **Multiplicité des attaques** : `compute_damages` résout ensuite la caractéristique d'attaques en dehors du pipeline typé et convolue la distribution mono-attaque pour obtenir la distribution finale.
+- **Moteur DP** : le module `src/probabilities/compute_engine.rs` maintient une distribution exacte sur les états de combat et applique chaque règle de manière itérative en agrégeant les probabilités (pas de simulation, pas d’arbre explicite).
 - **Résultat** : la distribution finale est marginalisée sur le champ `damages` pour produire une distribution `(dégâts, probabilité)`.
-- **Bindings** : 
+- **Bindings** :
     - `src/python/` expose `CombatConfig` + `compute_damages` et des wrappers de règles pour Python / API.
     - `src/wasm/` expose des fonctions WASM utilisées par `web/app.js` pour la démo interactive.
 
@@ -128,6 +119,8 @@ Les hooks configurés:
 - `cargo fmt` : Formatage du code Rust
 - `cargo clippy` : Linting du code Rust
 - `cargo test` : Exécution des tests
+- `ruff` : Linting Python (erreurs de code et problèmes potentiels)
+- `mypy` : Vérification statique des types Python
 - Vérifications générales : trailing whitespace, end-of-file, YAML, etc.
 
 ### Commandes utiles
@@ -153,4 +146,3 @@ make demo
 ## Licence
 
 (À définir)
-

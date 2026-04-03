@@ -20,10 +20,39 @@ class TestDiceRollFromStr:
         result = DiceRoll.from_str("2D6")
         assert isinstance(result, ND6)
 
-    def test_from_str_invalid(self):
-        """DiceRoll.from_str with an invalid string should raise ValueError."""
+    @pytest.mark.parametrize("value", ["invalid", "xD6", "D6junk", "2D6foo", "D3+2x", "0D6", "51D6", "51D3+1"])
+    def test_from_str_invalid(self, value):
+        """DiceRoll.from_str should reject malformed strings."""
         with pytest.raises(ValueError):
-            DiceRoll.from_str("invalid")
+            DiceRoll.from_str(value)
+
+    def test_from_str_accepts_fifty_dice(self):
+        """The parser should accept exactly 50 dice."""
+        result = DiceRoll.from_str("50D6")
+        assert isinstance(result, ND6)
+
+
+class TestMultiDiceBounds:
+    """Tests for the 50-dice upper bound on explicit dice classes."""
+
+    @pytest.mark.parametrize("factory,args", [
+        (ND6, (51,)),
+        (ND3, (51,)),
+        (ND6Plus, (51, 1)),
+        (ND3Plus, (51, 1)),
+    ])
+    def test_constructors_reject_more_than_fifty_dice(self, factory, args):
+        with pytest.raises(ValueError):
+            factory(*args)
+
+    @pytest.mark.parametrize("factory,args", [
+        (ND6, (50,)),
+        (ND3, (50,)),
+        (ND6Plus, (50, 1)),
+        (ND3Plus, (50, 1)),
+    ])
+    def test_constructors_accept_fifty_dice(self, factory, args):
+        factory(*args)
 
 
 class TestD6:

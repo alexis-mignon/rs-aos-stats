@@ -1,16 +1,11 @@
 /// Python wrappers for the Rust rule implementations.
 ///
-/// Each `*RulePy` class is a thin shell around the corresponding
-/// Rust type in `rules_impl`, allowing Python to build rule sequences
-/// that plug directly into the DP engine.
-use crate::probabilities::rules_impl::{
-    AttackCharacteristicRule, CritAutoWoundRule, CritDoubleHitRule, CritMortalWoundRule,
-    DamagesRule, HitRule, SaveRule, WardRule, WoundRule,
-};
+/// These classes mirror the per-attack phases used internally by
+/// `compute_damages(config, hit_rule_type)`. Attack-count handling is
+/// resolved inside `compute_damages`, so the exported sequence starts
+/// directly at the hit-rule phase.
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-
-use crate::probabilities::compute_engine::Rule;
 
 #[pyclass(name = "HitRule")]
 #[derive(Clone, Debug)]
@@ -21,12 +16,6 @@ impl HitRulePy {
     #[new]
     fn new() -> Self {
         Self {}
-    }
-}
-
-impl From<HitRulePy> for HitRule {
-    fn from(_val: HitRulePy) -> Self {
-        HitRule
     }
 }
 
@@ -42,12 +31,6 @@ impl WoundRulePy {
     }
 }
 
-impl From<WoundRulePy> for WoundRule {
-    fn from(_val: WoundRulePy) -> Self {
-        WoundRule
-    }
-}
-
 #[pyclass(name = "SaveRule")]
 #[derive(Clone, Debug)]
 pub struct SaveRulePy;
@@ -57,12 +40,6 @@ impl SaveRulePy {
     #[new]
     fn new() -> Self {
         Self {}
-    }
-}
-
-impl From<SaveRulePy> for SaveRule {
-    fn from(_val: SaveRulePy) -> Self {
-        SaveRule
     }
 }
 
@@ -78,30 +55,6 @@ impl DamagesRulePy {
     }
 }
 
-impl From<DamagesRulePy> for DamagesRule {
-    fn from(_val: DamagesRulePy) -> Self {
-        DamagesRule
-    }
-}
-
-#[pyclass(name = "AttackCharacteristicRule")]
-#[derive(Clone, Debug)]
-pub struct AttackCharacteristicRulePy;
-
-#[pymethods]
-impl AttackCharacteristicRulePy {
-    #[new]
-    fn new() -> Self {
-        Self {}
-    }
-}
-
-impl From<AttackCharacteristicRulePy> for AttackCharacteristicRule {
-    fn from(_val: AttackCharacteristicRulePy) -> Self {
-        AttackCharacteristicRule
-    }
-}
-
 #[pyclass(name = "WardRule")]
 #[derive(Clone, Debug)]
 pub struct WardRulePy;
@@ -111,12 +64,6 @@ impl WardRulePy {
     #[new]
     fn new() -> Self {
         Self {}
-    }
-}
-
-impl From<WardRulePy> for WardRule {
-    fn from(_val: WardRulePy) -> Self {
-        WardRule
     }
 }
 
@@ -132,12 +79,6 @@ impl CritAutoWoundRulePy {
     }
 }
 
-impl From<CritAutoWoundRulePy> for CritAutoWoundRule {
-    fn from(_val: CritAutoWoundRulePy) -> Self {
-        CritAutoWoundRule
-    }
-}
-
 #[pyclass(name = "CritMortalWoundRule")]
 #[derive(Clone, Debug)]
 pub struct CritMortalWoundRulePy;
@@ -147,12 +88,6 @@ impl CritMortalWoundRulePy {
     #[new]
     fn new() -> Self {
         Self {}
-    }
-}
-
-impl From<CritMortalWoundRulePy> for CritMortalWoundRule {
-    fn from(_val: CritMortalWoundRulePy) -> Self {
-        CritMortalWoundRule
     }
 }
 
@@ -168,51 +103,11 @@ impl CritDoubleHitRulePy {
     }
 }
 
-impl From<CritDoubleHitRulePy> for CritDoubleHitRule {
-    fn from(_val: CritDoubleHitRulePy) -> Self {
-        CritDoubleHitRule
-    }
-}
-
-pub fn extract_rule(rule: &Bound<'_, PyAny>) -> PyResult<Box<dyn Rule>> {
-    if let Ok(rule) = rule.extract::<HitRulePy>() {
-        let rule: HitRule = rule.into();
-        Ok(Box::new(rule))
-    } else if let Ok(rule) = rule.extract::<WoundRulePy>() {
-        let rule: WoundRule = rule.into();
-        Ok(Box::new(rule))
-    } else if let Ok(rule) = rule.extract::<SaveRulePy>() {
-        let rule: SaveRule = rule.into();
-        Ok(Box::new(rule))
-    } else if let Ok(rule) = rule.extract::<DamagesRulePy>() {
-        let rule: DamagesRule = rule.into();
-        Ok(Box::new(rule))
-    } else if let Ok(rule) = rule.extract::<AttackCharacteristicRulePy>() {
-        let rule: AttackCharacteristicRule = rule.into();
-        Ok(Box::new(rule))
-    } else if let Ok(rule) = rule.extract::<WardRulePy>() {
-        let rule: WardRule = rule.into();
-        Ok(Box::new(rule))
-    } else if let Ok(rule) = rule.extract::<CritAutoWoundRulePy>() {
-        let rule: CritAutoWoundRule = rule.into();
-        Ok(Box::new(rule))
-    } else if let Ok(rule) = rule.extract::<CritMortalWoundRulePy>() {
-        let rule: CritMortalWoundRule = rule.into();
-        Ok(Box::new(rule))
-    } else if let Ok(rule) = rule.extract::<CritDoubleHitRulePy>() {
-        let rule: CritDoubleHitRule = rule.into();
-        Ok(Box::new(rule))
-    } else {
-        Err(PyValueError::new_err("Unknown rule type"))
-    }
-}
-
 pub fn register_rules(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<HitRulePy>()?;
     m.add_class::<WoundRulePy>()?;
     m.add_class::<SaveRulePy>()?;
     m.add_class::<DamagesRulePy>()?;
-    m.add_class::<AttackCharacteristicRulePy>()?;
     m.add_class::<WardRulePy>()?;
     m.add_class::<CritAutoWoundRulePy>()?;
     m.add_class::<CritMortalWoundRulePy>()?;
@@ -228,10 +123,6 @@ pub fn build_standard_sequence_py(
 ) -> PyResult<Vec<PyObject>> {
     let mut rules: Vec<PyObject> = Vec::new();
 
-    // Always start with attack characteristic
-    rules.push(Py::new(py, AttackCharacteristicRulePy)?.into());
-
-    // Add hit rule based on type
     match hit_rule_type {
         "normal" => {
             rules.push(Py::new(py, HitRulePy)?.into());
@@ -253,12 +144,10 @@ pub fn build_standard_sequence_py(
         }
     }
 
-    // Always continue with wound, save, and damages
     rules.push(Py::new(py, WoundRulePy)?.into());
     rules.push(Py::new(py, SaveRulePy)?.into());
     rules.push(Py::new(py, DamagesRulePy)?.into());
 
-    // Add ward after damages (WardRule operates on status.damages)
     if has_ward {
         rules.push(Py::new(py, WardRulePy)?.into());
     }

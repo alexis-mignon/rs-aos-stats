@@ -2,6 +2,16 @@ use crate::probabilities::combat_stats::{AttackStats, Characteristic, DefenseSta
 use crate::probabilities::dice::DiceRoll;
 use pyo3::{exceptions::PyValueError, prelude::*};
 
+fn require_non_negative(field_name: &str, value: i32) -> PyResult<u32> {
+    if value < 0 {
+        Err(PyValueError::new_err(format!(
+            "{field_name} must be non-negative"
+        )))
+    } else {
+        Ok(value as u32)
+    }
+}
+
 #[pyclass(name = "Characteristic")]
 #[derive(Clone, Copy, Debug)]
 pub struct CharacteristicPy {
@@ -14,7 +24,10 @@ impl CharacteristicPy {
     fn new(value: Bound<'_, PyAny>) -> PyResult<Self> {
         if let Ok(char_val) = value.extract::<i32>() {
             Ok(CharacteristicPy {
-                characteristic: Characteristic::Value(char_val as u32),
+                characteristic: Characteristic::Value(require_non_negative(
+                    "characteristic value",
+                    char_val,
+                )?),
             })
         } else if let Ok(char_roll) = TryInto::try_into(&value) {
             Ok(CharacteristicPy {
@@ -28,7 +41,7 @@ impl CharacteristicPy {
                 ),
             })
         } else {
-            Err(PyValueError::new_err("Could not convert to Characteritic"))
+            Err(PyValueError::new_err("Could not convert to Characteristic"))
         }
     }
 }
@@ -36,14 +49,6 @@ impl CharacteristicPy {
 impl From<CharacteristicPy> for Characteristic {
     fn from(val: CharacteristicPy) -> Self {
         val.characteristic
-    }
-}
-
-impl From<i32> for CharacteristicPy {
-    fn from(val: i32) -> Self {
-        CharacteristicPy {
-            characteristic: Characteristic::Value(val as u32),
-        }
     }
 }
 
@@ -55,7 +60,10 @@ pub struct AttackStatsPy {
 
 fn extract_characteristic(value: &Bound<'_, PyAny>) -> PyResult<Characteristic> {
     if let Ok(char_val) = value.extract::<i32>() {
-        Ok(Characteristic::Value(char_val as u32))
+        Ok(Characteristic::Value(require_non_negative(
+            "characteristic value",
+            char_val,
+        )?))
     } else if let Ok(dice_str) = value.extract::<String>() {
         Ok(Characteristic::DiceRoll(
             DiceRoll::from_str(&dice_str).map_err(|e| PyValueError::new_err(e.to_string()))?,
@@ -82,9 +90,9 @@ impl AttackStatsPy {
         Ok(AttackStatsPy {
             attack_stats: AttackStats {
                 attacks: extract_characteristic(&attacks)?,
-                to_hit: to_hit as u32,
-                to_wound: to_wound as u32,
-                rend: rend as u32,
+                to_hit: require_non_negative("to_hit", to_hit)?,
+                to_wound: require_non_negative("to_wound", to_wound)?,
+                rend: require_non_negative("rend", rend)?,
                 damages: extract_characteristic(&damages)?,
             },
         })

@@ -1,122 +1,89 @@
 use crate::probabilities::combat_stats::Characteristic;
-use crate::probabilities::compute_engine::{CombatConfig, CombatStatus, Rule};
+use crate::probabilities::compute_engine::{CombatConfig, Rule};
 use crate::probabilities::dice::DiceRoll;
 use crate::probabilities::partitions::generate_partitions_probabilities;
+use crate::probabilities::states::*;
+use std::hash::Hash;
 
-#[derive(Clone, Debug)]
-pub struct AttackCharacteristicRule;
-/// Determines the number of attacks for the current profile.
-///
-/// If the characteristic is a fixed value we just forward it, otherwise
-/// we expand the dice expression into an exact `(value, probability)`
-/// distribution and branch the combat state accordingly.
-impl Rule for AttackCharacteristicRule {
-    fn apply(
-        &self,
-        status: &CombatStatus,
-        probability: f64,
-        config: &CombatConfig,
-    ) -> Vec<(CombatStatus, f64)> {
-        let attack_num_stat = config.attack_stats.attacks;
+// ---------------------------------------------------------------------------
+// Generic helper traits
+// ---------------------------------------------------------------------------
 
-        let values_and_probas = match attack_num_stat {
-            Characteristic::Value(value) => vec![(value, 1.0)],
-            Characteristic::DiceRoll(roll) => roll.values_and_probas(),
-        };
-
-        values_and_probas
-            .iter()
-            .map(|(value, proba)| (status.with_attacks(*value), probability * proba))
-            .collect()
-    }
-}
-
-/// Shared helper for rules that can be modelled as "roll N identical dice
-/// and classify each roll into a small number of outcome buckets".
-///
-/// Examples: hit/wound/save tests, ward saves, and crit variants.
-/// All of them only depend on the number of rolls, the per-roll outcome
-/// probabilities and on how the final bucket counts update `CombatStatus`.
-pub trait TestRollRule: Rule {
-    fn roll_count(&self, status: &CombatStatus) -> u32;
+/// Shared helper for rules modelled as "roll N identical dice and classify
+/// each roll into a small number of outcome buckets".
+pub(crate) trait TestRollRule<In, Out>: Rule<In, Out>
+where
+    In: Clone + Eq + Hash,
+    Out: Clone + Eq + Hash,
+{
+    fn roll_count(&self, state: &In) -> u32;
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64>;
-    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus;
+    fn build_state(&self, state: &In, counts: &[u32]) -> Out;
 
-    /// Apply the multinomial distribution induced by this rule to a single
-    /// `(CombatStatus, probability)` state.
-    ///
-    /// - `partition_prior` gives the probability of each outcome bucket for
-    ///   one die (e.g. `[P(crit), P(normal hit), P(miss)]`).
-    /// - `roll_count` says how many dice we roll.
-    /// - `generate_partitions_probabilities` then enumerates all possible
-    ///   bucket count vectors and their multinomial probabilities.
-    /// - For each such partition we build a new `CombatStatus` and scale the
-    ///   current state probability accordingly.
     fn apply_distribution(
         &self,
-        status: &CombatStatus,
+        state: &In,
         probability: f64,
         config: &CombatConfig,
-    ) -> Vec<(CombatStatus, f64)> {
+    ) -> Vec<(Out, f64)> {
         let probas = self.partition_prior(config);
-        let nrolls = self.roll_count(status);
+        let nrolls = self.roll_count(state);
         let partitions = generate_partitions_probabilities(nrolls, &probas);
         let mut results = vec![];
         for (counts, proba) in partitions {
-            let new_status = self.build_status(status, &counts);
-            results.push((new_status, probability * proba));
+            let new_state = self.build_state(state, &counts);
+            results.push((new_state, probability * proba));
         }
         results
     }
 }
 
 /// Base implementation for hit-like rules with three outcome buckets:
-/// critical hit, normal hit and failure.
+/// critical hit, normal hit, and failure.
 ///
 /// Concrete rules only need to decide how the partition counts map to
 /// `(hits, wounds, mortal_wounds)` via `result`.
-pub trait BaseHitRule: TestRollRule {
-    fn roll_count(&self, status: &CombatStatus) -> u32 {
-        status.attacks
+pub(crate) trait BaseHitRule: TestRollRule<Initial, Hit> {
+    fn hit_roll_count(&self, _state: &Initial) -> u32 {
+        1
     }
-    fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
-        // Per-roll probabilities for the three buckets:
-        //  - index 0: critical hits (natural 6)
-        //  - index 1: normal successful hits (meeting to-hit after modifiers)
-        //  - index 2: failures.
 
+    fn hit_partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
         let critical_proba = 1.0 / 6.0;
-        let success_proba = (1..=6)
-            .map(|roll| {
-                match roll {
-                    6 => 0.0, // 6s are critical and will be counted separately
-                    1 => 0.0,
-                    _ => {
-                        (config.modifier.apply_to_hit_modifier(roll) >= config.attack_stats.to_hit)
-                            as u32 as f64
-                            / 6.0
-                    }
+        let success_proba: f64 = (1..=6)
+            .map(|roll| match roll {
+                6 => 0.0,
+                1 => 0.0,
+                _ => {
+                    (config.modifier.apply_to_hit_modifier(roll) >= config.attack_stats.to_hit)
+                        as u32 as f64
+                        / 6.0
                 }
             })
             .sum();
 
         vec![
-            1.0 / 6.0,
+            critical_proba,
             success_proba,
             1.0 - success_proba - critical_proba,
         ]
     }
 
     fn result(&self, partition: &[u32]) -> (u32, u32, u32);
-    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
+
+    fn hit_build_state(&self, _state: &Initial, counts: &[u32]) -> Hit {
         let (hits, wounds, mortal_wounds) = self.result(counts);
-        status
-            .with_attacks(0)
-            .with_hits(hits)
-            .with_wounds(wounds)
-            .with_mortal_wounds(mortal_wounds)
+        Hit {
+            hits,
+            wounds,
+            mortal_wounds,
+        }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Hit rules: Initial → Hit
+// ---------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
 pub struct HitRule;
@@ -127,41 +94,131 @@ impl BaseHitRule for HitRule {
     }
 }
 
-impl TestRollRule for HitRule {
-    fn roll_count(&self, status: &CombatStatus) -> u32 {
-        BaseHitRule::roll_count(self, status)
+impl TestRollRule<Initial, Hit> for HitRule {
+    fn roll_count(&self, state: &Initial) -> u32 {
+        BaseHitRule::hit_roll_count(self, state)
     }
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
-        BaseHitRule::partition_prior(self, config)
+        BaseHitRule::hit_partition_prior(self, config)
     }
-    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
-        BaseHitRule::build_status(self, status, counts)
+    fn build_state(&self, state: &Initial, counts: &[u32]) -> Hit {
+        BaseHitRule::hit_build_state(self, state, counts)
     }
 }
 
-impl Rule for HitRule {
-    fn apply(
-        &self,
-        status: &CombatStatus,
-        probability: f64,
-        config: &CombatConfig,
-    ) -> Vec<(CombatStatus, f64)> {
-        TestRollRule::apply_distribution(self, status, probability, config)
+impl Rule<Initial, Hit> for HitRule {
+    fn apply(&self, state: &Initial, probability: f64, config: &CombatConfig) -> Vec<(Hit, f64)> {
+        TestRollRule::apply_distribution(self, state, probability, config)
     }
 }
+
+// ---------------------------------------------------------------------------
+// CritMortalWoundRule: Initial → Hit
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug)]
+pub struct CritMortalWoundRule;
+
+impl BaseHitRule for CritMortalWoundRule {
+    fn result(&self, partition: &[u32]) -> (u32, u32, u32) {
+        (partition[1], 0, partition[0])
+    }
+}
+
+impl TestRollRule<Initial, Hit> for CritMortalWoundRule {
+    fn roll_count(&self, state: &Initial) -> u32 {
+        BaseHitRule::hit_roll_count(self, state)
+    }
+    fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
+        BaseHitRule::hit_partition_prior(self, config)
+    }
+    fn build_state(&self, state: &Initial, counts: &[u32]) -> Hit {
+        BaseHitRule::hit_build_state(self, state, counts)
+    }
+}
+
+impl Rule<Initial, Hit> for CritMortalWoundRule {
+    fn apply(&self, state: &Initial, probability: f64, config: &CombatConfig) -> Vec<(Hit, f64)> {
+        TestRollRule::apply_distribution(self, state, probability, config)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CritAutoWoundRule: Initial → Hit
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug)]
+pub struct CritAutoWoundRule;
+
+impl BaseHitRule for CritAutoWoundRule {
+    fn result(&self, partition: &[u32]) -> (u32, u32, u32) {
+        (partition[1], partition[0], 0)
+    }
+}
+
+impl TestRollRule<Initial, Hit> for CritAutoWoundRule {
+    fn roll_count(&self, state: &Initial) -> u32 {
+        BaseHitRule::hit_roll_count(self, state)
+    }
+    fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
+        BaseHitRule::hit_partition_prior(self, config)
+    }
+    fn build_state(&self, state: &Initial, counts: &[u32]) -> Hit {
+        BaseHitRule::hit_build_state(self, state, counts)
+    }
+}
+
+impl Rule<Initial, Hit> for CritAutoWoundRule {
+    fn apply(&self, state: &Initial, probability: f64, config: &CombatConfig) -> Vec<(Hit, f64)> {
+        TestRollRule::apply_distribution(self, state, probability, config)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CritDoubleHitRule: Initial → Hit
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug)]
+pub struct CritDoubleHitRule;
+
+impl BaseHitRule for CritDoubleHitRule {
+    fn result(&self, partition: &[u32]) -> (u32, u32, u32) {
+        (2 * partition[0] + partition[1], 0, 0)
+    }
+}
+
+impl TestRollRule<Initial, Hit> for CritDoubleHitRule {
+    fn roll_count(&self, state: &Initial) -> u32 {
+        BaseHitRule::hit_roll_count(self, state)
+    }
+    fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
+        BaseHitRule::hit_partition_prior(self, config)
+    }
+    fn build_state(&self, state: &Initial, counts: &[u32]) -> Hit {
+        BaseHitRule::hit_build_state(self, state, counts)
+    }
+}
+
+impl Rule<Initial, Hit> for CritDoubleHitRule {
+    fn apply(&self, state: &Initial, probability: f64, config: &CombatConfig) -> Vec<(Hit, f64)> {
+        TestRollRule::apply_distribution(self, state, probability, config)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WoundRule: Hit → Wounded
+// ---------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
 pub struct WoundRule;
 
-impl TestRollRule for WoundRule {
-    fn roll_count(&self, status: &CombatStatus) -> u32 {
-        status.hits
+impl TestRollRule<Hit, Wounded> for WoundRule {
+    fn roll_count(&self, state: &Hit) -> u32 {
+        state.hits
     }
+
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
-        // Two buckets for each wound roll:
-        //  - index 0: successful wounds
-        //  - index 1: failed wounds.
-        let success_proba = (1..=6)
+        let success_proba: f64 = (1..=6)
             .map(|roll| match roll {
                 1 => 0.0,
                 _ => {
@@ -174,34 +231,35 @@ impl TestRollRule for WoundRule {
 
         vec![success_proba, 1.0 - success_proba]
     }
-    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
-        status.with_hits(0).with_wounds(counts[0] + status.wounds)
+
+    fn build_state(&self, state: &Hit, counts: &[u32]) -> Wounded {
+        Wounded {
+            wounds: counts[0] + state.wounds,
+            mortal_wounds: state.mortal_wounds,
+        }
     }
 }
 
-impl Rule for WoundRule {
-    fn apply(
-        &self,
-        status: &CombatStatus,
-        probability: f64,
-        config: &CombatConfig,
-    ) -> Vec<(CombatStatus, f64)> {
-        TestRollRule::apply_distribution(self, status, probability, config)
+impl Rule<Hit, Wounded> for WoundRule {
+    fn apply(&self, state: &Hit, probability: f64, config: &CombatConfig) -> Vec<(Wounded, f64)> {
+        TestRollRule::apply_distribution(self, state, probability, config)
     }
 }
+
+// ---------------------------------------------------------------------------
+// SaveRule: Wounded → Saved
+// ---------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
 pub struct SaveRule;
 
-impl TestRollRule for SaveRule {
-    fn roll_count(&self, status: &CombatStatus) -> u32 {
-        status.wounds
+impl TestRollRule<Wounded, Saved> for SaveRule {
+    fn roll_count(&self, state: &Wounded) -> u32 {
+        state.wounds
     }
+
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
-        // Two buckets for each save roll:
-        //  - index 0: successful saves
-        //  - index 1: failed saves (become unsaved wounds).
-        let success_proba = (1..=6)
+        let success_proba: f64 = (1..=6)
             .map(|roll| match roll {
                 1 => 0.0,
                 _ => {
@@ -215,119 +273,58 @@ impl TestRollRule for SaveRule {
 
         vec![success_proba, 1.0 - success_proba]
     }
-    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
-        status.with_hits(0).with_wounds(status.wounds - counts[0])
+
+    fn build_state(&self, state: &Wounded, counts: &[u32]) -> Saved {
+        Saved {
+            unsaved_wounds: state.wounds - counts[0],
+            mortal_wounds: state.mortal_wounds,
+        }
     }
 }
 
-impl Rule for SaveRule {
-    fn apply(
-        &self,
-        status: &CombatStatus,
-        probability: f64,
-        config: &CombatConfig,
-    ) -> Vec<(CombatStatus, f64)> {
-        TestRollRule::apply_distribution(self, status, probability, config)
+impl Rule<Wounded, Saved> for SaveRule {
+    fn apply(&self, state: &Wounded, probability: f64, config: &CombatConfig) -> Vec<(Saved, f64)> {
+        TestRollRule::apply_distribution(self, state, probability, config)
     }
 }
+
+// ---------------------------------------------------------------------------
+// DamagesRule: Saved → Damaged
+// ---------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
 pub struct DamagesRule;
 
 impl DamagesRule {
-    fn _random_damages(roll: DiceRoll, num_wounds: u32) -> Vec<(u32, f64)> {
-        // For each wound, damage is an independent draw from `roll`.
-        //
-        // If we have `num_wounds` such draws, the total damage is the sum of
-        // `num_wounds` i.i.d. variables. We compute the exact distribution of
-        // this sum by repeated convolution of the single-wound distribution
-        // instead of enumerating all integer partitions, which would be
-        // combinatorially expensive for large `num_wounds`.
-
-        let n = num_wounds as usize;
-        if n == 0 {
-            return vec![(0, 1.0)];
-        }
-
-        let single = roll.values_and_probas();
-        // Maximum damage from a single wound
-        let max_single = single.iter().map(|(v, _)| *v as usize).max().unwrap_or(0);
-
-        if max_single == 0 {
-            return vec![(0, 1.0)];
-        }
-
-        let max_total = max_single * n;
-        let mut dist = vec![0.0_f64; max_total + 1];
-        dist[0] = 1.0;
-
-        for _ in 0..n {
-            let mut new_dist = vec![0.0_f64; max_total + 1];
-            for (sum, &p_sum) in dist.iter().enumerate() {
-                if p_sum == 0.0 {
-                    continue;
-                }
-                for (d, p_d) in &single {
-                    let new_sum = sum + *d as usize;
-                    if new_sum <= max_total {
-                        new_dist[new_sum] += p_sum * p_d;
-                    }
-                }
-            }
-            dist = new_dist;
-        }
-
-        let mut results: Vec<(u32, f64)> = dist
-            .iter()
-            .enumerate()
-            .filter_map(|(damage, &p)| {
-                if p > 0.0 {
-                    Some((damage as u32, p))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        // Ensure a stable, ascending order (useful for callers/tests).
-        results.sort_by_key(|(d, _)| *d);
-        results
+    fn random_damages(roll: DiceRoll, num_wounds: u32) -> Vec<(u32, f64)> {
+        crate::probabilities::convolution::convolve_n(&roll.values_and_probas(), num_wounds)
     }
 }
 
-impl Rule for DamagesRule {
-    fn apply(
-        &self,
-        status: &CombatStatus,
-        probability: f64,
-        config: &CombatConfig,
-    ) -> Vec<(CombatStatus, f64)> {
-        let num_wounds = status.wounds + status.mortal_wounds;
+impl Rule<Saved, Damaged> for DamagesRule {
+    fn apply(&self, state: &Saved, probability: f64, config: &CombatConfig) -> Vec<(Damaged, f64)> {
+        let num_wounds = state.unsaved_wounds + state.mortal_wounds;
         let damages_and_probas = match config.attack_stats.damages {
             Characteristic::Value(value) => vec![(value * num_wounds, 1.0)],
-            Characteristic::DiceRoll(roll) => DamagesRule::_random_damages(roll, num_wounds),
+            Characteristic::DiceRoll(roll) => DamagesRule::random_damages(roll, num_wounds),
         };
         damages_and_probas
             .iter()
-            .map(|(damages, proba)| {
-                (
-                    status
-                        .with_mortal_wounds(0)
-                        .with_wounds(0)
-                        .with_damages(*damages),
-                    probability * proba,
-                )
-            })
+            .map(|(damages, proba)| (Damaged { damages: *damages }, probability * proba))
             .collect()
     }
 }
 
+// ---------------------------------------------------------------------------
+// WardRule: Damaged → Damaged
+// ---------------------------------------------------------------------------
+
 #[derive(Clone, Debug)]
 pub struct WardRule;
 
-impl TestRollRule for WardRule {
-    fn roll_count(&self, status: &CombatStatus) -> u32 {
-        status.damages
+impl TestRollRule<Damaged, Damaged> for WardRule {
+    fn roll_count(&self, state: &Damaged) -> u32 {
+        state.damages
     }
 
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
@@ -335,10 +332,7 @@ impl TestRollRule for WardRule {
             .defense_stats
             .ward
             .expect("WardRule requires ward save to be set");
-        // Two buckets for each ward roll:
-        //  - index 0: successful ward (damage prevented)
-        //  - index 1: failed ward (damage goes through).
-        let success_proba = (1..=6)
+        let success_proba: f64 = (1..=6)
             .map(|roll| match roll {
                 1 => 0.0,
                 _ => (roll >= ward_value) as u32 as f64 / 6.0,
@@ -348,127 +342,126 @@ impl TestRollRule for WardRule {
         vec![success_proba, 1.0 - success_proba]
     }
 
-    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
-        status.with_damages(status.damages - counts[0])
-    }
-}
-
-impl Rule for WardRule {
-    fn apply(
-        &self,
-        status: &CombatStatus,
-        probability: f64,
-        config: &CombatConfig,
-    ) -> Vec<(CombatStatus, f64)> {
-        if config.defense_stats.ward.is_some() {
-            TestRollRule::apply_distribution(self, status, probability, config)
-        } else {
-            // When no ward is present, this rule should behave as a no-op
-            // so that including it in a sequence does not change results.
-            vec![(*status, probability)]
+    fn build_state(&self, state: &Damaged, counts: &[u32]) -> Damaged {
+        Damaged {
+            damages: state.damages - counts[0],
         }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct CritMortalWoundRule;
-
-impl BaseHitRule for CritMortalWoundRule {
-    fn result(&self, partition: &[u32]) -> (u32, u32, u32) {
-        // `partition[0]` = crits, `partition[1]` = normal hits.
-        // Crits become mortal wounds, normal hits stay as hits.
-        (partition[1], 0, partition[0])
-    }
-}
-
-impl TestRollRule for CritMortalWoundRule {
-    fn roll_count(&self, status: &CombatStatus) -> u32 {
-        BaseHitRule::roll_count(self, status)
-    }
-    fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
-        BaseHitRule::partition_prior(self, config)
-    }
-    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
-        BaseHitRule::build_status(self, status, counts)
-    }
-}
-
-impl Rule for CritMortalWoundRule {
+impl Rule<Damaged, Damaged> for WardRule {
     fn apply(
         &self,
-        status: &CombatStatus,
+        state: &Damaged,
         probability: f64,
         config: &CombatConfig,
-    ) -> Vec<(CombatStatus, f64)> {
-        TestRollRule::apply_distribution(self, status, probability, config)
+    ) -> Vec<(Damaged, f64)> {
+        if config.defense_stats.ward.is_some() {
+            TestRollRule::apply_distribution(self, state, probability, config)
+        } else {
+            vec![(*state, probability)]
+        }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct CritAutoWoundRule;
+// ---------------------------------------------------------------------------
+// HitRuleVariant enum for convenience pipeline construction
+// ---------------------------------------------------------------------------
 
-impl BaseHitRule for CritAutoWoundRule {
-    fn result(&self, partition: &[u32]) -> (u32, u32, u32) {
-        // `partition[0]` = crits, `partition[1]` = normal hits.
-        // Crits skip the wound roll and go straight to the wound pool.
-        (partition[1], partition[0], 0)
+/// Selects which hit rule variant to use in the standard pipeline.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HitRuleVariant {
+    Normal,
+    CritAutoWound,
+    CritMortalWound,
+    CritDoubleHit,
+}
+
+impl std::str::FromStr for HitRuleVariant {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "normal" => Ok(HitRuleVariant::Normal),
+            "crit_auto_wound" => Ok(HitRuleVariant::CritAutoWound),
+            "crit_mortal_wound" => Ok(HitRuleVariant::CritMortalWound),
+            "crit_double_hit" => Ok(HitRuleVariant::CritDoubleHit),
+            _ => Err(format!(
+                "Invalid hit_rule_type '{}'. Must be one of: 'normal', 'crit_auto_wound', 'crit_mortal_wound', 'crit_double_hit'",
+                s
+            )),
+        }
     }
 }
 
-impl TestRollRule for CritAutoWoundRule {
-    fn roll_count(&self, status: &CombatStatus) -> u32 {
-        BaseHitRule::roll_count(self, status)
-    }
-    fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
-        BaseHitRule::partition_prior(self, config)
-    }
-    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
-        BaseHitRule::build_status(self, status, counts)
-    }
+/// Compute the exact damage probability distribution for a combat profile.
+///
+/// This is the main entry point. It runs the pipeline for a single attack,
+/// then convolves the result N times for N attacks. For random attack counts
+/// (dice), it marginalizes over possible values.
+pub fn compute_damages(config: CombatConfig, hit_variant: HitRuleVariant) -> Vec<(u32, f64)> {
+    use crate::probabilities::convolution::{convolve_n, mix};
+
+    let single = compute_single_attack(&config, hit_variant);
+    let attack_values = config.attack_stats.attacks.values_and_probas();
+
+    let convolved: Vec<Vec<(u32, f64)>> = attack_values
+        .iter()
+        .map(|(n, _)| convolve_n(&single, *n))
+        .collect();
+    let components: Vec<(&[(u32, f64)], f64)> = convolved
+        .iter()
+        .zip(attack_values.iter())
+        .map(|(dist, (_, p))| (dist.as_slice(), *p))
+        .collect();
+    mix(&components)
 }
 
-impl Rule for CritAutoWoundRule {
-    fn apply(
-        &self,
-        status: &CombatStatus,
-        probability: f64,
-        config: &CombatConfig,
-    ) -> Vec<(CombatStatus, f64)> {
-        TestRollRule::apply_distribution(self, status, probability, config)
-    }
-}
+/// Run the pipeline for a single attack, returning the damage distribution.
+fn compute_single_attack(config: &CombatConfig, hit_variant: HitRuleVariant) -> Vec<(u32, f64)> {
+    use crate::probabilities::compute_engine::PipelineBuilder;
 
-#[derive(Clone, Debug)]
-pub struct CritDoubleHitRule;
+    let has_ward = config.defense_stats.ward.is_some();
 
-impl BaseHitRule for CritDoubleHitRule {
-    fn result(&self, partition: &[u32]) -> (u32, u32, u32) {
-        // `partition[0]` = crits, `partition[1]` = normal hits.
-        // Crits count as two hits each.
-        (2 * partition[0] + partition[1], 0, 0)
+    macro_rules! finish_pipeline {
+        ($after_hits:expr, $config:expr, $has_ward:expr) => {{
+            let after_damage = $after_hits
+                .add_rule(WoundRule)
+                .add_rule(SaveRule)
+                .add_rule(DamagesRule);
+            if $has_ward {
+                after_damage.add_rule(WardRule).compute_damages(&$config)
+            } else {
+                after_damage.compute_damages(&$config)
+            }
+        }};
     }
-}
 
-impl TestRollRule for CritDoubleHitRule {
-    fn roll_count(&self, status: &CombatStatus) -> u32 {
-        BaseHitRule::roll_count(self, status)
-    }
-    fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
-        BaseHitRule::partition_prior(self, config)
-    }
-    fn build_status(&self, status: &CombatStatus, counts: &[u32]) -> CombatStatus {
-        BaseHitRule::build_status(self, status, counts)
-    }
-}
-
-impl Rule for CritDoubleHitRule {
-    fn apply(
-        &self,
-        status: &CombatStatus,
-        probability: f64,
-        config: &CombatConfig,
-    ) -> Vec<(CombatStatus, f64)> {
-        TestRollRule::apply_distribution(self, status, probability, config)
+    match hit_variant {
+        HitRuleVariant::Normal => {
+            finish_pipeline!(PipelineBuilder::new().add_rule(HitRule), config, has_ward)
+        }
+        HitRuleVariant::CritAutoWound => {
+            finish_pipeline!(
+                PipelineBuilder::new().add_rule(CritAutoWoundRule),
+                config,
+                has_ward
+            )
+        }
+        HitRuleVariant::CritMortalWound => {
+            finish_pipeline!(
+                PipelineBuilder::new().add_rule(CritMortalWoundRule),
+                config,
+                has_ward
+            )
+        }
+        HitRuleVariant::CritDoubleHit => {
+            finish_pipeline!(
+                PipelineBuilder::new().add_rule(CritDoubleHitRule),
+                config,
+                has_ward
+            )
+        }
     }
 }
 
@@ -476,9 +469,7 @@ impl Rule for CritDoubleHitRule {
 mod tests {
     use super::*;
     use crate::probabilities::combat_stats::{AttackStats, DefenseStats};
-    use crate::probabilities::compute_engine::compute_damages;
 
-    /// Helper: build a CombatConfig with fixed-value attacks and damages.
     fn make_config(
         attacks: u32,
         to_hit: u32,
@@ -500,29 +491,21 @@ mod tests {
         )
     }
 
-    /// Helper: sum all probabilities in a damage distribution.
     fn proba_sum(results: &[(u32, f64)]) -> f64 {
         results.iter().map(|(_, p)| p).sum()
     }
 
-    /// Helper: the standard combat sequence (attacks → hit → wound → save → damages).
-    fn standard_sequence() -> Vec<Box<dyn Rule>> {
-        vec![
-            Box::new(AttackCharacteristicRule),
-            Box::new(HitRule),
-            Box::new(WoundRule),
-            Box::new(SaveRule),
-            Box::new(DamagesRule),
-        ]
+    fn mean_damage(config: CombatConfig, variant: HitRuleVariant) -> f64 {
+        compute_damages(config, variant)
+            .iter()
+            .map(|(d, p)| *d as f64 * p)
+            .sum()
     }
 
-    /// End-to-end test with a simple profile: 1 attack, 2+ hit, 2+ wound,
-    /// no save, 1 damage. Verifies the exact P(1 damage) = 25/36
-    /// (5/6 hit chance including crits * 5/6 wound chance).
     #[test]
     fn simple_fixed_attack() {
         let config = make_config(1, 2, 2, 0, 1, 7, None);
-        let results = compute_damages(config, &standard_sequence());
+        let results = compute_damages(config, HitRuleVariant::Normal);
         let total = proba_sum(&results);
         assert!((total - 1.0).abs() < 1e-10);
         let p1 = results
@@ -533,61 +516,32 @@ mod tests {
         assert!((p1 - 25.0 / 36.0).abs() < 1e-10);
     }
 
-    /// When both to_hit and to_wound thresholds are impossible (7+),
-    /// all probability must land on 0 damage. Note that crits (6) still
-    /// hit, but the wound roll at 7+ blocks all damage.
     #[test]
     fn all_miss() {
         let config = make_config(1, 7, 7, 0, 1, 7, None);
-        let results = compute_damages(config, &standard_sequence());
+        let results = compute_damages(config, HitRuleVariant::Normal);
         let p0: f64 = results
             .iter()
             .filter(|(d, _)| *d == 0)
             .map(|(_, p)| *p)
             .sum();
         assert!((p0 - 1.0).abs() < 1e-10);
-        let non_zero: f64 = results
-            .iter()
-            .filter(|(d, _)| *d > 0)
-            .map(|(_, p)| *p)
-            .sum();
-        assert!(non_zero.abs() < 1e-10);
     }
 
-    /// CritDoubleHitRule: critical rolls of 6 count as two hits instead of
-    /// one. With 3 attacks and 2 damage each, the theoretical maximum is
-    /// 3 crits * 2 hits * 2 damage = 12.
     #[test]
     fn crit_double_hit_max_damage() {
         let config = make_config(3, 4, 4, 0, 2, 7, None);
-        let sequence: Vec<Box<dyn Rule>> = vec![
-            Box::new(AttackCharacteristicRule),
-            Box::new(CritDoubleHitRule),
-            Box::new(WoundRule),
-            Box::new(SaveRule),
-            Box::new(DamagesRule),
-        ];
-        let results = compute_damages(config, &sequence);
+        let results = compute_damages(config, HitRuleVariant::CritDoubleHit);
         let total = proba_sum(&results);
         assert!((total - 1.0).abs() < 1e-10);
         let max_damage = results.iter().map(|(d, _)| *d).max().unwrap();
         assert_eq!(max_damage, 12);
     }
 
-    /// CritAutoWoundRule: crits bypass the wound roll entirely. With
-    /// to_wound=7 (impossible), only crits (1/6) can deal damage, so
-    /// P(1 damage) = 1/6.
     #[test]
     fn crit_auto_wound() {
         let config = make_config(1, 4, 7, 0, 1, 7, None);
-        let sequence: Vec<Box<dyn Rule>> = vec![
-            Box::new(AttackCharacteristicRule),
-            Box::new(CritAutoWoundRule),
-            Box::new(WoundRule),
-            Box::new(SaveRule),
-            Box::new(DamagesRule),
-        ];
-        let results = compute_damages(config, &sequence);
+        let results = compute_damages(config, HitRuleVariant::CritAutoWound);
         let p1 = results
             .iter()
             .find(|(d, _)| *d == 1)
@@ -596,35 +550,20 @@ mod tests {
         assert!((p1 - 1.0 / 6.0).abs() < 1e-10);
     }
 
-    /// CritMortalWoundRule: crits generate mortal wounds instead of normal
-    /// hits. With 1 attack and 1 damage, the max damage is still 1
-    /// (either via mortal wound from a crit, or via a normal wound).
     #[test]
     fn crit_mortal_wound() {
         let config = make_config(1, 4, 4, 0, 1, 7, None);
-        let sequence: Vec<Box<dyn Rule>> = vec![
-            Box::new(AttackCharacteristicRule),
-            Box::new(CritMortalWoundRule),
-            Box::new(WoundRule),
-            Box::new(SaveRule),
-            Box::new(DamagesRule),
-        ];
-        let results = compute_damages(config, &sequence);
+        let results = compute_damages(config, HitRuleVariant::CritMortalWound);
         let total = proba_sum(&results);
         assert!((total - 1.0).abs() < 1e-10);
         let max_damage = results.iter().map(|(d, _)| *d).max().unwrap();
         assert_eq!(max_damage, 1);
     }
 
-    /// A 4+ ward save should halve the probability of taking damage.
-    /// With P(wound) = 25/36 and a 4+ ward (50% chance to negate),
-    /// P(1 damage) = 25/72.
     #[test]
     fn ward_save_reduces_damage() {
         let config = make_config(1, 2, 2, 0, 1, 7, Some(4));
-        let mut sequence = standard_sequence();
-        sequence.push(Box::new(WardRule));
-        let results = compute_damages(config, &sequence);
+        let results = compute_damages(config, HitRuleVariant::Normal);
         let total = proba_sum(&results);
         assert!((total - 1.0).abs() < 1e-10);
         let p1 = results
@@ -635,20 +574,14 @@ mod tests {
         assert!((p1 - 25.0 / 72.0).abs() < 1e-10);
     }
 
-    /// Sanity check on a more complex profile (3 attacks, 3+ hit, 4+ wound,
-    /// rend 1, 2 damage, 4+ save, 6+ ward): probabilities must sum to 1.
     #[test]
     fn probabilities_always_sum_to_one() {
         let config = make_config(3, 3, 4, 1, 2, 4, Some(6));
-        let mut sequence = standard_sequence();
-        sequence.push(Box::new(WardRule));
-        let results = compute_damages(config, &sequence);
+        let results = compute_damages(config, HitRuleVariant::Normal);
         let total = proba_sum(&results);
         assert!((total - 1.0).abs() < 1e-10);
     }
 
-    /// Test AttackCharacteristicRule with DiceRoll (D3) instead of fixed value.
-    /// With D3 attacks (1-3), we should get different possible damage outcomes.
     #[test]
     fn attack_characteristic_with_dice() {
         let config = CombatConfig::new(
@@ -661,16 +594,13 @@ mod tests {
             ),
             DefenseStats::new(7, None),
         );
-        let results = compute_damages(config, &standard_sequence());
+        let results = compute_damages(config, HitRuleVariant::Normal);
         let total = proba_sum(&results);
         assert!((total - 1.0).abs() < 1e-10);
-        // With D3 attacks, max damage should be 3 (if all 3 attacks hit and wound)
         let max_damage = results.iter().map(|(d, _)| *d).max().unwrap();
         assert!(max_damage <= 3);
     }
 
-    /// Test DamagesRule with DiceRoll (D3) instead of fixed damage value.
-    /// With 1 attack dealing D3 damage, outcomes should range from 0 to 3.
     #[test]
     fn damages_with_dice() {
         let config = CombatConfig::new(
@@ -683,105 +613,67 @@ mod tests {
             ),
             DefenseStats::new(7, None),
         );
-        let results = compute_damages(config, &standard_sequence());
+        let results = compute_damages(config, HitRuleVariant::Normal);
         let total = proba_sum(&results);
         assert!((total - 1.0).abs() < 1e-10);
-        // With D3 damage, if the attack hits and wounds, damage should be 1-3
         let has_positive_damage = results.iter().any(|(d, p)| *d > 0 && *p > 0.0);
         assert!(has_positive_damage);
     }
 
-    /// Test WardRule when no ward save is present. The rule should behave
-    /// as a no-op so sequences including it don't change results.
     #[test]
     fn ward_rule_no_ward() {
+        // WardRule with no ward configured should be a no-op
         let config = make_config(1, 2, 2, 0, 1, 7, None);
-        let ward_rule = WardRule;
-        let status = CombatStatus::new_with_values(0, 0, 0, 0, 1);
-        let result = ward_rule.apply(&status, 1.0, &config);
-        // When no ward is present, WardRule should leave the state unchanged
-        // and preserve the probability.
+        let state = Damaged { damages: 1 };
+        let result = <WardRule as Rule<Damaged, Damaged>>::apply(&WardRule, &state, 1.0, &config);
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0].0, status);
+        assert_eq!(result[0].0, state);
         assert!((result[0].1 - 1.0).abs() < 1e-12);
     }
 
-    /// Helper: compute mean damage for a given config and sequence.
-    fn mean_damage(config: CombatConfig, sequence: &Vec<Box<dyn Rule>>) -> f64 {
-        compute_damages(config, sequence)
-            .iter()
-            .map(|(d, p)| *d as f64 * p)
-            .sum()
-    }
-
-    /// Helper: build a crit sequence replacing HitRule with the given crit rule.
-    fn crit_sequence(crit_rule: Box<dyn Rule>) -> Vec<Box<dyn Rule>> {
-        vec![
-            Box::new(AttackCharacteristicRule),
-            crit_rule,
-            Box::new(WoundRule),
-            Box::new(SaveRule),
-            Box::new(DamagesRule),
-        ]
-    }
-
-    /// CritAutoWoundRule should increase mean damage compared to normal hits.
     #[test]
     fn crit_auto_wound_increases_mean_damage() {
         let config = make_config(10, 3, 3, 1, 1, 4, None);
-        let normal = mean_damage(config, &standard_sequence());
-        let crit = mean_damage(config, &crit_sequence(Box::new(CritAutoWoundRule)));
+        let normal = mean_damage(config, HitRuleVariant::Normal);
+        let crit = mean_damage(config, HitRuleVariant::CritAutoWound);
         assert!(
             crit > normal,
             "CritAutoWound ({crit:.4}) should exceed normal ({normal:.4})"
         );
     }
 
-    /// CritMortalWoundRule should increase mean damage compared to normal hits.
     #[test]
     fn crit_mortal_wound_increases_mean_damage() {
         let config = make_config(10, 3, 3, 1, 1, 4, None);
-        let normal = mean_damage(config, &standard_sequence());
-        let crit = mean_damage(config, &crit_sequence(Box::new(CritMortalWoundRule)));
+        let normal = mean_damage(config, HitRuleVariant::Normal);
+        let crit = mean_damage(config, HitRuleVariant::CritMortalWound);
         assert!(
             crit > normal,
             "CritMortalWound ({crit:.4}) should exceed normal ({normal:.4})"
         );
     }
 
-    /// CritDoubleHitRule should increase mean damage compared to normal hits.
     #[test]
     fn crit_double_hit_increases_mean_damage() {
         let config = make_config(10, 3, 3, 1, 1, 4, None);
-        let normal = mean_damage(config, &standard_sequence());
-        let crit = mean_damage(config, &crit_sequence(Box::new(CritDoubleHitRule)));
+        let normal = mean_damage(config, HitRuleVariant::Normal);
+        let crit = mean_damage(config, HitRuleVariant::CritDoubleHit);
         assert!(
             crit > normal,
             "CritDoubleHit ({crit:.4}) should exceed normal ({normal:.4})"
         );
     }
 
-    /// All crit rules should increase mean damage even with a difficult
-    /// to-hit roll (6+ means only crits land).
     #[test]
     fn crit_rules_increase_damage_at_six_plus_to_hit() {
         let config = make_config(10, 6, 3, 0, 1, 4, None);
-        let normal = mean_damage(config, &standard_sequence());
-        for (name, rule) in [
-            (
-                "CritAutoWound",
-                Box::new(CritAutoWoundRule) as Box<dyn Rule>,
-            ),
-            (
-                "CritMortalWound",
-                Box::new(CritMortalWoundRule) as Box<dyn Rule>,
-            ),
-            (
-                "CritDoubleHit",
-                Box::new(CritDoubleHitRule) as Box<dyn Rule>,
-            ),
+        let normal = mean_damage(config, HitRuleVariant::Normal);
+        for (name, variant) in [
+            ("CritAutoWound", HitRuleVariant::CritAutoWound),
+            ("CritMortalWound", HitRuleVariant::CritMortalWound),
+            ("CritDoubleHit", HitRuleVariant::CritDoubleHit),
         ] {
-            let crit = mean_damage(config, &crit_sequence(rule));
+            let crit = mean_damage(config, variant);
             assert!(
                 crit > normal,
                 "{name} ({crit:.4}) should exceed normal ({normal:.4}) at 6+ to hit"
@@ -789,38 +681,40 @@ mod tests {
         }
     }
 
-    /// Ward save should strictly reduce mean damage across several profiles.
     #[test]
     fn ward_reduces_mean_damage() {
         let profiles = [
-            make_config(10, 3, 3, 1, 1, 4, Some(4)),
-            make_config(5, 2, 2, 0, 2, 5, Some(5)),
-            make_config(3, 4, 4, 2, 3, 3, Some(6)),
+            (
+                make_config(10, 3, 3, 1, 1, 4, None),
+                make_config(10, 3, 3, 1, 1, 4, Some(4)),
+            ),
+            (
+                make_config(5, 2, 2, 0, 2, 5, None),
+                make_config(5, 2, 2, 0, 2, 5, Some(5)),
+            ),
+            (
+                make_config(3, 4, 4, 2, 3, 3, None),
+                make_config(3, 4, 4, 2, 3, 3, Some(6)),
+            ),
         ];
-        for config in profiles {
-            let mut ward_sequence = standard_sequence();
-            ward_sequence.push(Box::new(WardRule));
-
-            let without = mean_damage(config, &standard_sequence());
-            let with = mean_damage(config, &ward_sequence);
+        for (config_no_ward, config_ward) in profiles {
+            let without = mean_damage(config_no_ward, HitRuleVariant::Normal);
+            let with = mean_damage(config_ward, HitRuleVariant::Normal);
             assert!(
                 with < without,
                 "Ward should reduce damage: {with:.4} >= {without:.4} for config {:?}",
-                config
+                config_ward
             );
         }
     }
 
-    /// Stronger ward saves (lower threshold) should reduce damage more.
     #[test]
     fn stronger_ward_reduces_more() {
         let config_4plus = make_config(10, 3, 3, 1, 2, 4, Some(4));
         let config_5plus = make_config(10, 3, 3, 1, 2, 4, Some(5));
-        let mut ward_sequence = standard_sequence();
-        ward_sequence.push(Box::new(WardRule));
 
-        let mean_4plus = mean_damage(config_4plus, &ward_sequence);
-        let mean_5plus = mean_damage(config_5plus, &ward_sequence);
+        let mean_4plus = mean_damage(config_4plus, HitRuleVariant::Normal);
+        let mean_5plus = mean_damage(config_5plus, HitRuleVariant::Normal);
         assert!(
             mean_4plus < mean_5plus,
             "4+ ward ({mean_4plus:.4}) should reduce more than 5+ ({mean_5plus:.4})"
