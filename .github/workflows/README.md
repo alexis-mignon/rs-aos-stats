@@ -12,7 +12,7 @@ Exécuté sur chaque push et pull request vers `main`.
 - **test-rust** : Tests unitaires Rust
 - **check-rust** : Vérification du formatage (rustfmt) et linting (clippy)
 - **build-wasm** : Compilation WebAssembly pour vérifier que ça build
-- **test-python** : Tests des bindings Python sur Linux, macOS, Windows avec Python 3.9-3.12
+- **test-python** : Tests des bindings Python sur Linux, macOS, Windows avec Python 3.9-3.13
 
 ### 2. Deploy (`deploy.yml`)
 
@@ -29,7 +29,7 @@ Déploie automatiquement la démo WASM sur GitHub Pages à chaque push sur `main
 Crée des releases automatiques lors de la création d'un tag (ex: `v0.1.0`).
 
 **Jobs :**
-- Build des wheels Python pour Linux, macOS, Windows (Python 3.9-3.12)
+- Build des wheels Python pour Linux, macOS, Windows (Python 3.9-3.13)
 - Build de l'archive WASM
 - Création automatique de la release GitHub avec tous les assets
 - Publication optionnelle sur PyPI
