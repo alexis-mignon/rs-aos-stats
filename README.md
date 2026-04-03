@@ -9,7 +9,7 @@ Une bibliothèque Rust pour calculer les probabilités de dégâts dans Warhamme
 
 ## 🎮 Démo en ligne
 
-**Essayez la démo interactive** : [https://alexis-mignon.github.io/rs-aos-stats/](https://alexis-mignon.github.io/rs-aos-stats/)
+**Essayez la démo interactive** : [https://alexis-mignon.github.io/rs-aos-stats/index.html](https://alexis-mignon.github.io/rs-aos-stats/index.html)
 
 ## Fonctionnalités
 
