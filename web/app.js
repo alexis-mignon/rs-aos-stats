@@ -1,6 +1,7 @@
 import init, { compute_combat_damage_with_dice } from './pkg/rs_aos_stats.js';
 
 let chart = null;
+let cumulativeChart = null;
 
 // Initialize the WASM module
 async function initWasm() {
@@ -356,8 +357,9 @@ function updateCalculation() {
         // Show stats summary
         document.getElementById('stats-summary').style.display = 'grid';
 
-        // Update chart
+        // Update charts
         updateChart(result);
+        updateCumulativeChart(result);
 
         // Hide error if it was showing
         errorEl.classList.remove('active');
@@ -426,6 +428,100 @@ function updateChart(result) {
             scales: {
                 y: {
                     beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Probability (%)',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Damage',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateCumulativeChart(result) {
+    const ctx = document.getElementById('cumulative-chart').getContext('2d');
+
+    const labels = result.probabilities.map(p => p.damage.toString());
+
+    // Compute cumulative probabilities (P(damage >= X))
+    // Start from the highest damage and accumulate downward
+    const probs = result.probabilities.map(p => p.probability);
+    const cumulativeData = [];
+    let cumSum = 0;
+    for (let i = probs.length - 1; i >= 0; i--) {
+        cumSum += probs[i];
+        cumulativeData[i] = (cumSum * 100);
+    }
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(102, 126, 234, 0.3)');
+    gradient.addColorStop(1, 'rgba(118, 75, 162, 0.05)');
+
+    if (cumulativeChart) {
+        cumulativeChart.destroy();
+    }
+
+    cumulativeChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'P(Damage ≥ X) (%)',
+                data: cumulativeData,
+                backgroundColor: gradient,
+                borderColor: 'rgba(102, 126, 234, 1)',
+                borderWidth: 2,
+                borderRadius: 5,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                title: {
+                    display: true,
+                    text: 'Cumulative Probability (P(Damage ≥ X))',
+                    font: {
+                        size: 18,
+                        weight: 'bold'
+                    },
+                    color: '#333'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `P(Damage ≥ ${context.label}): ${context.parsed.y.toFixed(2)}%`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
                     title: {
                         display: true,
                         text: 'Probability (%)',
