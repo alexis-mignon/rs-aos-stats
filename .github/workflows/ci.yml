@@ -129,8 +129,8 @@ jobs:
             target
           key: ${{ runner.os }}-${{ matrix.python-version }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install maturin
-        run: pip install maturin pytest hypothesis
+      - name: Install test dependencies
+        run: pip install maturin pytest hypothesis nbformat nbclient numpy matplotlib ipywidgets
 
       - name: Build Python package
         run: maturin build --features python --out dist

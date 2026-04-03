@@ -17,6 +17,11 @@ dev = [
     "pre-commit",
     "pytest",
     "hypothesis",
+    "nbformat",
+    "nbclient",
+    "numpy",
+    "matplotlib",
+    "ipywidgets",
     "ruff",
     "mypy",
 ]
