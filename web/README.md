@@ -1,122 +1,122 @@
 # AoS Stats Calculator - WebAssembly Demo
 
-Une application web interactive pour calculer et visualiser les probabilités de dégâts dans Warhammer Age of Sigmar, compilée en WebAssembly pour des performances optimales.
+An interactive web application for computing and visualizing Warhammer Age of Sigmar damage probabilities, compiled to WebAssembly for performance.
 
-## ✨ Fonctionnalités
+## ✨ Features
 
-- **Calcul de probabilités en temps réel** : Visualisez instantanément les distributions de dégâts
-- **Interface interactive** : Sliders pour ajuster facilement toutes les statistiques
-- **Règles de critiques multiples** :
-  - Hit normale
-  - Critique Auto-Wound
-  - Critique Mortal Wound
-  - Critique Double Hit
-- **Graphiques dynamiques** : Visualisation claire avec Chart.js
-- **Performance WASM** : Calculs rapides grâce à Rust compilé en WebAssembly
+- **Real-time probability calculation**: instantly visualize damage distributions
+- **Interactive UI**: sliders make it easy to adjust all stats
+- **Multiple critical hit rules**:
+  - Normal hit
+  - Critical auto-wound
+  - Critical mortal wound
+  - Critical double hit
+- **Dynamic charts**: clear visualization with Chart.js
+- **WASM performance**: fast calculations powered by Rust compiled to WebAssembly
 
-## 🚀 Installation et utilisation
+## 🚀 Installation and Usage
 
-### Prérequis
+### Prerequisites
 
-- Rust et Cargo installés
-- `wasm-pack` (sera installé automatiquement par le Makefile si absent)
+- Rust and Cargo installed
+- `wasm-pack` (installed automatically by the Makefile if missing)
 
-### Construction et lancement
+### Build and Run
 
-Depuis la racine du projet :
+From the project root:
 
 ```bash
-# Tout en un: compiler, lancer le serveur et ouvrir le navigateur
+# All in one: build, start the server, and open the browser
 make demo
 
-# Ou étape par étape:
-make wasm          # Compiler le module WASM (production, optimisé)
-make wasm-dev      # Compiler le module WASM (dev, plus rapide)
-make serve         # Lancer le serveur web sur http://localhost:8080
-make open          # Ouvrir le navigateur
-make clean         # Nettoyer les fichiers générés
-make help          # Voir toutes les cibles disponibles
+# Or step by step:
+make wasm          # Build the WASM module (production, optimized)
+make wasm-dev      # Build the WASM module (development, faster)
+make serve         # Start the web server on http://localhost:8080
+make open          # Open the browser
+make clean         # Clean generated files
+make help          # Show all available targets
 ```
 
-Alternative manuelle :
+Manual alternative:
 ```bash
-# Compiler le WASM
+# Build WASM
 wasm-pack build --target web --out-dir web/pkg --features wasm
 
-# Lancer le serveur
+# Start the server
 cd web
 python3 -m http.server 8080
 ```
 
-## 🎮 Guide d'utilisation
+## 🎮 Usage Guide
 
-### Statistiques d'attaque
+### Attack Stats
 
-- **Attacks** : Nombre d'attaques (1-30)
-- **To Hit (X+)** : Seuil de réussite pour toucher (2+ à 6+)
-- **To Wound (X+)** : Seuil de réussite pour blesser (2+ à 6+)
-- **Rend** : Valeur de perforation d'armure (0-5)
-- **Damage** : Dégâts par attaque réussie (1-6)
+- **Attacks**: number of attacks (1-30)
+- **To Hit (X+)**: hit threshold (2+ to 6+)
+- **To Wound (X+)**: wound threshold (2+ to 6+)
+- **Rend**: armor penetration value (0-5)
+- **Damage**: damage per successful attack (1-6)
 
-### Statistiques de défense
+### Defense Stats
 
-- **Save (X+)** : Seuil de réussite de sauvegarde (2+ à 6+)
-- **Ward (X+)** : Sauvegarde invulnérable optionnelle (2+ à 7, où 7 = aucune)
+- **Save (X+)**: save threshold (2+ to 6+)
+- **Ward (X+)**: optional ward save (2+ to 7, where 7 means none)
 
-### Règles de Hit
+### Hit Rules
 
-- **Normal** : Hit standard, les 6 critiques comptent comme 1 hit
-- **Critical Auto-Wound** : Les 6 critiques blessent automatiquement
-- **Critical Mortal Wound** : Les 6 critiques infligent des blessures mortelles
-- **Critical Double Hit** : Les 6 critiques comptent comme 2 hits
+- **Normal**: standard hit, critical 6s count as 1 hit
+- **Critical Auto-Wound**: critical 6s automatically wound
+- **Critical Mortal Wound**: critical 6s inflict mortal wounds
+- **Critical Double Hit**: critical 6s count as 2 hits
 
-## 📊 Résultats affichés
+## 📊 Displayed Results
 
-- **Mean Damage** : Dégâts moyens attendus
-- **Max Damage** : Dégâts maximum possibles
-- **Distribution de probabilité** : Graphique à barres montrant la probabilité de chaque valeur de dégât
+- **Mean Damage**: expected damage
+- **Max Damage**: maximum possible damage
+- **Probability distribution**: bar chart showing the probability for each damage value
 
-## 🔧 Architecture technique
+## 🔧 Technical Architecture
 
 ```
 web/
-├── index.html      # Interface utilisateur
-├── app.js          # Logique JavaScript et interaction WASM
-└── pkg/            # Module WASM généré (après build)
+├── index.html      # User interface
+├── app.js          # JavaScript logic and WASM integration
+└── pkg/            # Generated WASM module (after build)
     ├── rs_aos_stats.js
     ├── rs_aos_stats_bg.wasm
     └── ...
 ```
 
-Le module WASM expose principalement :
-- `compute_combat_damage()` : Calcule la distribution de dégâts pour une configuration donnée
+The WASM module primarily exposes:
+- `compute_combat_damage()`: computes the damage distribution for a given configuration
 
-## 🎨 Personnalisation
+## 🎨 Customization
 
-L'interface utilise un design moderne avec :
-- Gradient violet/bleu
-- Responsive design pour mobile et desktop
-- Visualisation interactive avec Chart.js
-- Feedback en temps réel
+The interface uses a modern design with:
+- burgundy gradient styling
+- responsive layout for desktop and mobile
+- interactive Chart.js visualizations
+- real-time feedback
 
-Vous pouvez personnaliser les couleurs et le style en modifiant le CSS dans `index.html`.
+You can customize colors and styling by editing the CSS in `index.html`.
 
 ## 📝 Notes
 
-- Les calculs sont effectués en Rust et compilés en WebAssembly pour des performances optimales
-- Tous les calculs sont exacts (pas de simulation Monte Carlo), utilisant des probabilités précises
-- La bibliothèque supporte également les jets de dés aléatoires (D3, D6) pour les attaques et dégâts
+- Calculations are performed in Rust and compiled to WebAssembly for performance
+- All calculations are exact; there is no Monte Carlo simulation
+- The library also supports random dice characteristics (D3, D6) for attacks and damage
 
-## 🐛 Dépannage
+## 🐛 Troubleshooting
 
-**Le WASM ne se charge pas** :
-- Assurez-vous d'utiliser un serveur HTTP (pas `file://`)
-- Vérifiez la console du navigateur pour les erreurs
+**WASM does not load**:
+- Make sure you are using an HTTP server, not `file://`
+- Check the browser console for errors
 
-**Les calculs ne se mettent pas à jour** :
-- Rechargez la page
-- Vérifiez que tous les fichiers dans `web/pkg/` ont été générés
+**Calculations do not update**:
+- Reload the page
+- Verify that all files in `web/pkg/` were generated
 
-**Erreur de build** :
-- Assurez-vous que `wasm-pack` est installé : `cargo install wasm-pack`
-- Vérifiez que la feature `wasm` est activée dans `Cargo.toml`
+**Build error**:
+- Make sure `wasm-pack` is installed: `cargo install wasm-pack`
+- Verify that the `wasm` feature is enabled in `Cargo.toml`

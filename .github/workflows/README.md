@@ -1,86 +1,86 @@
 # GitHub Actions Workflows
 
-Ce dossier contient les workflows CI/CD pour le projet rs-aos-stats.
+This directory contains the CI/CD workflows for the rs-aos-stats project.
 
-## 📋 Workflows disponibles
+## 📋 Available Workflows
 
 ### 1. CI (`ci.yml`)
 
-Exécuté sur chaque push et pull request vers `main`.
+Runs on every push and pull request targeting `main`.
 
-**Jobs :**
-- **test-rust** : Tests unitaires Rust
-- **check-rust** : Vérification du formatage (rustfmt) et linting (clippy)
-- **build-wasm** : Compilation WebAssembly pour vérifier que ça build
-- **test-python** : Tests des bindings Python sur Linux, macOS, Windows avec Python 3.9-3.13
-- **python-quality** : Qualité Python (ruff + mypy)
+**Jobs:**
+- **test-rust**: Rust unit tests
+- **check-rust**: formatting checks (`rustfmt`) and linting (`clippy`)
+- **build-wasm**: WebAssembly build verification
+- **test-python**: Python binding tests on Linux, macOS, and Windows with Python 3.9-3.13
+- **python-quality**: Python quality checks (`ruff` + `mypy`)
 
 ### 2. Deploy (`deploy.yml`)
 
-Déploie automatiquement la démo WASM sur GitHub Pages à chaque push sur `main`.
+Automatically deploys the WASM demo to GitHub Pages on every push to `main`.
 
-**Configuration nécessaire :**
+**Required configuration:**
 
-1. Aller dans `Settings > Pages` de votre repo GitHub
-2. Source : `GitHub Actions`
-3. La démo sera disponible à : `https://<username>.github.io/<repo>/`
+1. Go to `Settings > Pages` in your GitHub repository
+2. Set the source to `GitHub Actions`
+3. The demo will be available at `https://<username>.github.io/<repo>/`
 
 ### 3. Release (`release.yml`)
 
-Crée des releases automatiques lors de la création d'un tag (ex: `v0.1.0`).
+Creates automated releases when a tag is pushed, for example `v0.1.0`.
 
-**Jobs :**
-- Build des wheels Python pour Linux, macOS, Windows (Python 3.9-3.13)
-- Build de l'archive WASM
-- Création automatique de la release GitHub avec tous les assets
-- Publication optionnelle sur PyPI
+**Jobs:**
+- Build Python wheels for Linux, macOS, and Windows (Python 3.9-3.13)
+- Build the WASM archive
+- Create the GitHub release automatically with all assets
+- Optionally publish to PyPI
 
-**Configuration nécessaire pour PyPI :**
+**Required configuration for PyPI:**
 
-1. Créer un token API sur PyPI : https://pypi.org/manage/account/token/
-2. Ajouter le secret dans GitHub :
-   - Aller dans `Settings > Secrets and variables > Actions`
-   - Créer un nouveau secret : `PYPI_API_TOKEN`
-   - Valeur : votre token PyPI
+1. Create a PyPI API token: https://pypi.org/manage/account/token/
+2. Add the secret in GitHub:
+   - Go to `Settings > Secrets and variables > Actions`
+   - Create a new secret named `PYPI_API_TOKEN`
+   - Set its value to your PyPI token
 
-**Créer une release :**
+**Create a release:**
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-La release sera créée automatiquement avec :
-- Notes de version auto-générées
-- Wheels Python pour toutes les plateformes
-- Archive WASM complète
+The release will be created automatically with:
+- auto-generated release notes
+- Python wheels for all platforms
+- the complete WASM archive
 
-## 🔧 Badge de statut
+## 🔧 Status Badges
 
-Ajoutez ces badges dans votre README.md :
+Add these badges to your README.md:
 
 ```markdown
 [![CI](https://github.com/<username>/<repo>/actions/workflows/ci.yml/badge.svg)](https://github.com/<username>/<repo>/actions/workflows/ci.yml)
 [![Deploy](https://github.com/<username>/<repo>/actions/workflows/deploy.yml/badge.svg)](https://github.com/<username>/<repo>/actions/workflows/deploy.yml)
 ```
 
-## 🚀 Actions manuelles
+## 🚀 Manual Actions
 
-Les workflows peuvent être déclenchés manuellement via l'onglet "Actions" sur GitHub (pour `deploy.yml`).
+Some workflows can be triggered manually from the GitHub "Actions" tab, including `deploy.yml`.
 
 ## 📊 Cache
 
-Les workflows utilisent le cache GitHub Actions pour accélérer les builds :
-- Cache Cargo registry et index
-- Cache du dossier `target` de Rust
-- Cache de wasm-pack
+The workflows use GitHub Actions caching to speed up builds:
+- Cargo registry and index cache
+- Rust `target` directory cache
+- `wasm-pack` cache
 
-## ⚠️  Notes importantes
+## ⚠️ Important Notes
 
-1. **Test Python** : Le job `test-python` exécute les tests Python du dossier `tests/` avec pytest
+1. **Python tests**: the `test-python` job runs the Python tests in `tests/` with pytest
 
-2. **GitHub Pages** : Assurez-vous que GitHub Pages est activé dans les paramètres de votre repo
+2. **GitHub Pages**: make sure GitHub Pages is enabled in your repository settings
 
-3. **PyPI** : Le workflow de release ne publiera sur PyPI que si le secret `PYPI_API_TOKEN` est configuré
+3. **PyPI**: the release workflow will publish to PyPI only if `PYPI_API_TOKEN` is configured
 
-4. **Temps de build** : Les premiers builds peuvent être lents (10-15 min), mais grâce au cache les suivants seront plus rapides (2-5 min)
+4. **Build time**: the first builds can be slow (10-15 min), but cached follow-up builds are typically much faster (2-5 min)

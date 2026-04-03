@@ -5,22 +5,22 @@
 
 Computing damage statistics for Warhammer Age Of Sigmar
 
-Une bibliothèque Rust pour calculer les probabilités de dégâts dans Warhammer Age of Sigmar, avec des bindings Python et une démo WebAssembly interactive.
+A Rust library for computing exact damage probabilities in Warhammer Age of Sigmar, with Python bindings, a REST API, and an interactive WebAssembly demo.
 
-## 🎮 Démo en ligne
+## 🎮 Live Demo
 
-**Essayez la démo interactive** : [https://alexis-mignon.github.io/rs-aos-stats/index.html](https://alexis-mignon.github.io/rs-aos-stats/index.html)
+**Try the interactive demo**: [https://alexis-mignon.github.io/rs-aos-stats/index.html](https://alexis-mignon.github.io/rs-aos-stats/index.html)
 
-## Fonctionnalités
+## Features
 
-- **Calculs de probabilités exacts** : Pas de simulation Monte Carlo, des probabilités précises
-- **Règles de combat complètes** : Support des hits, wounds, saves, wards, et règles spéciales
-- **Règles de critiques** : Auto-wound, mortal wounds, double hits
-- **Bindings Python** : Utilisable depuis Python avec PyO3
-- **API REST (FastAPI)** : Endpoint HTTP pour calculer les distributions de dégâts
-- **Démo WebAssembly** : Application web interactive pour visualiser les distributions de dégâts
+- **Exact probability calculations**: no Monte Carlo simulation, only precise distributions
+- **Complete combat rules**: supports hits, wounds, saves, wards, and special rules
+- **Critical hit rules**: auto-wound, mortal wounds, double hits
+- **Python bindings**: usable from Python via PyO3
+- **REST API (FastAPI)**: HTTP endpoint for computing damage distributions
+- **WebAssembly demo**: interactive web app for visualizing damage distributions
 
-## Utilisation
+## Usage
 
 ### Bindings Python
 
@@ -29,126 +29,126 @@ from rs_aos_stats import (
     AttackStats, DefenseStats, CombatConfig, compute_damages,
 )
 
-# Configurer les stats
+# Configure the stats
 attack_stats = AttackStats(attacks=10, to_hit=3, to_wound=3, rend=1, damage=1)
 defense_stats = DefenseStats(save=4, ward=None)
 config = CombatConfig(attack_stats, defense_stats, None)
 
-# Calculer les dégâts
+# Compute damage
 damages = compute_damages(config, "normal")
 for damage, probability in damages:
-    print(f"{damage} dégâts: {probability:.2%}")
+    print(f"{damage} damage: {probability:.2%}")
 ```
 
-### Démo WebAssembly
+### WebAssembly Demo
 
-Une démo web interactive est disponible dans le dossier `web/`.
+An interactive web demo is available in the `web/` directory.
 
-Pour l'essayer :
+To run it:
 
 ```bash
-# Tout en un: compiler, lancer le serveur et ouvrir le navigateur
+# All in one: build, start the server, and open the browser
 make demo
 
-# Ou étape par étape:
-make wasm          # Compiler le module WASM
-make serve         # Lancer le serveur web
-make open          # Ouvrir le navigateur
+# Or step by step:
+make wasm          # Build the WASM module
+make serve         # Start the web server
+make open          # Open the browser
 ```
 
-Voir [web/README.md](web/README.md) pour plus de détails.
+See [web/README.md](web/README.md) for more details.
 
 ### API REST
 
-Une API FastAPI est disponible dans le dossier `api/`.
+A FastAPI-based REST API is available in the `api/` directory.
 
-Pour la lancer :
+To start it:
 
 ```bash
-# Installer les dépendances API
+# Install API dependencies
 .venv/bin/pip install -r api/requirements.txt
 
-# Construire le module Python Rust
+# Build the Rust-backed Python module
 .venv/bin/maturin develop
 
-# Lancer le serveur API
+# Start the API server
 .venv/bin/uvicorn api.main:app --host 0.0.0.0 --port 8001
 ```
 
-Documentation interactive :
-- Swagger UI : `http://localhost:8001/docs`
-- ReDoc : `http://localhost:8001/redoc`
+Interactive documentation:
+- Swagger UI: `http://localhost:8001/docs`
+- ReDoc: `http://localhost:8001/redoc`
 
-Voir [api/README.md](api/README.md) pour la spécification complète de l'API (schémas, validations, exemples `curl`).
+See [api/README.md](api/README.md) for the full API specification, validation rules, and `curl` examples.
 
 ## Installation
 
-### Pour Python
+### Python
 
 ```bash
-# Installer avec pip (si publié sur PyPI)
+# Install with pip (if published to PyPI)
 pip install rs-aos-stats
 
-# Ou compiler depuis les sources
+# Or build from source
 pip install maturin
 maturin develop
 ```
 
-### Pour WebAssembly
+### WebAssembly
 
 ```bash
-# Utiliser le Makefile
-make demo          # Tout en un
+# Use the Makefile
+make demo          # All in one
 ```
 
-## Structure du projet
+## Project Structure
 
-- `src/probabilities/` : Logique de calcul des probabilités (core)
-- `src/python/` : Bindings Python avec PyO3
-- `src/wasm/` : Bindings WebAssembly avec wasm-bindgen
-- `api/` : API REST FastAPI et documentation OpenAPI
-- `web/` : Application web interactive
-- `examples/` : Exemples d'utilisation (Jupyter notebooks, scripts Python)
+- `src/probabilities/`: core probability engine
+- `src/python/`: Python bindings via PyO3
+- `src/wasm/`: WebAssembly bindings via wasm-bindgen
+- `api/`: FastAPI REST API and OpenAPI docs
+- `web/`: interactive web app
+- `examples/`: usage examples, including Jupyter notebooks
 
-## Vue d'ensemble du moteur de calcul
+## Calculation Engine Overview
 
-Le calcul des dégâts suit un pipeline clair :
+Damage computation follows a clear pipeline:
 
-- **Stats → Config** : les profils d'attaque/défense (AttackStats, DefenseStats, RollModifier) sont combinés dans un `CombatConfig`.
-- **Règles** : un `PipelineBuilder` typé enchaîne les règles de transition d'une attaque individuelle (`Initial` → `Hit` → `Wounded` → `Saved` → `Damaged`), avec vérification à la compilation de l’ordre correct.
-- **Multiplicité des attaques** : `compute_damages` résout ensuite la caractéristique d'attaques en dehors du pipeline typé et convolue la distribution mono-attaque pour obtenir la distribution finale.
-- **Moteur DP** : le module `src/probabilities/compute_engine.rs` maintient une distribution exacte sur les états de combat et applique chaque règle de manière itérative en agrégeant les probabilités (pas de simulation, pas d’arbre explicite).
-- **Résultat** : la distribution finale est marginalisée sur le champ `damages` pour produire une distribution `(dégâts, probabilité)`.
-- **Bindings** :
-    - `src/python/` expose `CombatConfig` + `compute_damages` et des wrappers de règles pour Python / API.
-    - `src/wasm/` expose des fonctions WASM utilisées par `web/app.js` pour la démo interactive.
+- **Stats → Config**: attack and defense profiles (`AttackStats`, `DefenseStats`, `RollModifier`) are combined into a `CombatConfig`.
+- **Rules**: a typed `PipelineBuilder` chains the transitions for a single attack (`Initial` → `Hit` → `Wounded` → `Saved` → `Damaged`) with compile-time ordering guarantees.
+- **Attack multiplicity**: `compute_damages` resolves the attacks characteristic outside the typed pipeline and convolves the single-attack distribution into the final result.
+- **DP engine**: `src/probabilities/compute_engine.rs` maintains an exact probability distribution over combat states and applies each rule iteratively, aggregating probabilities without simulation or an explicit tree.
+- **Result**: the final distribution is marginalized on the `damages` field to produce `(damage, probability)` pairs.
+- **Bindings**:
+  - `src/python/` exposes `CombatConfig` and `compute_damages`, plus rule wrappers used by Python and the API.
+  - `src/wasm/` exposes WASM functions used by `web/app.js` for the interactive demo.
 
-## Développement
+## Development
 
-### Configuration des pre-commit hooks
+### Pre-commit Hooks
 
-Pour assurer la qualité du code, installez les hooks de pre-commit qui exécuteront automatiquement les vérifications avant chaque commit:
+To enforce code quality, install the pre-commit hooks so checks run automatically before each commit:
 
 ```bash
-# Installer pre-commit
+# Install pre-commit
 pip install pre-commit
 
-# Installer les hooks dans le repo
+# Install the repository hooks
 pre-commit install
 
-# (Optionnel) Exécuter sur tous les fichiers
+# Optional: run on all files
 pre-commit run --all-files
 ```
 
-Les hooks configurés:
-- `cargo fmt` : Formatage du code Rust
-- `cargo clippy` : Linting du code Rust
-- `cargo test` : Exécution des tests
-- `ruff` : Linting Python (erreurs de code et problèmes potentiels)
-- `mypy` : Vérification statique des types Python
-- Vérifications générales : trailing whitespace, end-of-file, YAML, etc.
+Configured hooks:
+- `cargo fmt`: Rust formatting
+- `cargo clippy`: Rust linting
+- `cargo test`: test execution
+- `ruff`: Python linting
+- `mypy`: static type checking for Python
+- General hygiene checks: trailing whitespace, end-of-file, YAML, etc.
 
-### Commandes utiles
+### Useful Commands
 
 ```bash
 # Tests
@@ -161,13 +161,13 @@ pytest tests/ -v
 maturin develop
 
 # Build WASM
-make wasm          # Production (optimisé)
-make wasm-dev      # Development (rapide)
+make wasm          # Production build
+make wasm-dev      # Faster development build
 
-# Demo WASM complète
+# Full WASM demo
 make demo
 ```
 
-## Licence
+## License
 
-(À définir)
+(To be defined)
