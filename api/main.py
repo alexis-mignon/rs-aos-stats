@@ -182,11 +182,8 @@ async def calculate_damage(params: CombatParams):
         # Create combat config (attack_stats, defense_stats, roll_modifier)
         config = aos.CombatConfig(attack_stats, defense_stats, None)
 
-        # Get rule sequence using the binding's built-in helper
-        rules = aos.build_standard_sequence(params.hit_rule_type, effective_ward is not None)
-
-        # Compute damages
-        result = aos.compute_damages(config, rules)
+        # Compute damages using the typed pipeline API
+        result = aos.compute_damages(config, params.hit_rule_type)
 
         # Convert to response format
         probabilities = [

@@ -1,14 +1,7 @@
 import pytest
 from rs_aos_stats import (
     AttackStats, DefenseStats, CombatConfig, RollModifier, compute_damages,
-    HitRule, WoundRule, SaveRule, DamagesRule, AttackCharacteristicRule,
-    CritAutoWoundRule, CritMortalWoundRule, CritDoubleHitRule, WardRule,
 )
-
-STANDARD_SEQUENCE = [
-    AttackCharacteristicRule(), HitRule(), WoundRule(),
-    SaveRule(), DamagesRule(),
-]
 
 
 class TestComputeDamages:
@@ -20,7 +13,7 @@ class TestComputeDamages:
         defense_stats = DefenseStats(4, None)
         config = CombatConfig(attack_stats, defense_stats, None)
 
-        result = compute_damages(config, STANDARD_SEQUENCE)
+        result = compute_damages(config, "normal")
 
         assert len(result) > 0
         total = sum(p for _, p in result)
@@ -32,7 +25,7 @@ class TestComputeDamages:
         defense_stats = DefenseStats(4, None)
         config = CombatConfig(attack_stats, defense_stats, None)
 
-        result = compute_damages(config, STANDARD_SEQUENCE)
+        result = compute_damages(config, "normal")
 
         damages = [d for d, _ in result]
         assert 0 in damages
@@ -43,7 +36,7 @@ class TestComputeDamages:
         defense_stats = DefenseStats(4, None)
         config = CombatConfig(attack_stats, defense_stats, None)
 
-        result = compute_damages(config, STANDARD_SEQUENCE)
+        result = compute_damages(config, "normal")
 
         nonzero = [(d, p) for d, p in result if d > 0]
         assert len(nonzero) > 0
@@ -56,7 +49,7 @@ class TestComputeDamages:
         defense_stats = DefenseStats(4, None)
         config = CombatConfig(attack_stats, defense_stats, None)
 
-        result = compute_damages(config, STANDARD_SEQUENCE)
+        result = compute_damages(config, "normal")
 
         max_d = max(d for d, _ in result)
         assert max_d <= attacks * damage_per_hit
@@ -70,10 +63,8 @@ class TestComputeDamages:
             AttackStats(3, 3, 3, 1, 1), DefenseStats(4, 5), None,
         )
 
-        sequence = STANDARD_SEQUENCE + [WardRule()]
-
-        result_no_ward = compute_damages(config_no_ward, sequence)
-        result_with_ward = compute_damages(config_with_ward, sequence)
+        result_no_ward = compute_damages(config_no_ward, "normal")
+        result_with_ward = compute_damages(config_with_ward, "normal")
 
         avg_no_ward = sum(d * p for d, p in result_no_ward)
         avg_with_ward = sum(d * p for d, p in result_with_ward)
@@ -89,8 +80,8 @@ class TestComputeDamages:
             RollModifier(1, 0, 0),
         )
 
-        result_no_mod = compute_damages(config_no_mod, STANDARD_SEQUENCE)
-        result_with_mod = compute_damages(config_with_mod, STANDARD_SEQUENCE)
+        result_no_mod = compute_damages(config_no_mod, "normal")
+        result_with_mod = compute_damages(config_with_mod, "normal")
 
         avg_no_mod = sum(d * p for d, p in result_no_mod)
         avg_with_mod = sum(d * p for d, p in result_with_mod)
@@ -102,11 +93,7 @@ class TestComputeDamages:
         defense_stats = DefenseStats(7, None)  # No save
         config = CombatConfig(attack_stats, defense_stats, None)
 
-        sequence = [
-            AttackCharacteristicRule(), CritDoubleHitRule(),
-            WoundRule(), SaveRule(), DamagesRule(),
-        ]
-        result = compute_damages(config, sequence)
+        result = compute_damages(config, "crit_double_hit")
 
         max_d = max(d for d, _ in result)
         # With 2 attacks and CritDoubleHitRule, max hits = 4 (each crit gives 2)
@@ -118,34 +105,24 @@ class TestComputeDamages:
         defense_stats = DefenseStats(4, None)
         config = CombatConfig(attack_stats, defense_stats, None)
 
-        result = compute_damages(config, STANDARD_SEQUENCE)
+        result = compute_damages(config, "normal")
 
         assert len(result) > 0
         total = sum(p for _, p in result)
         assert abs(total - 1.0) < 1e-10
 
-    def test_invalid_rule_in_sequence(self):
-        """Passing a non-rule object in the sequence should raise."""
+    def test_invalid_hit_rule_type(self):
+        """Passing an invalid hit_rule_type should raise."""
         attack_stats = AttackStats(3, 3, 3, 1, 1)
         defense_stats = DefenseStats(4, None)
         config = CombatConfig(attack_stats, defense_stats, None)
 
         with pytest.raises(BaseException):
-            compute_damages(config, [42])
-
-
-WARD_SEQUENCE = STANDARD_SEQUENCE + [WardRule()]
+            compute_damages(config, "invalid_rule")
 
 
 def _mean(result):
     return sum(d * p for d, p in result)
-
-
-def _crit_sequence(crit_rule):
-    return [
-        AttackCharacteristicRule(), crit_rule,
-        WoundRule(), SaveRule(), DamagesRule(),
-    ]
 
 
 class TestCritRulesIncreaseDamage:
@@ -159,43 +136,43 @@ class TestCritRulesIncreaseDamage:
 
     @pytest.fixture()
     def normal_mean(self, standard_config):
-        return _mean(compute_damages(standard_config, STANDARD_SEQUENCE))
+        return _mean(compute_damages(standard_config, "normal"))
 
-    @pytest.mark.parametrize("crit_rule", [
-        CritAutoWoundRule(),
-        CritMortalWoundRule(),
-        CritDoubleHitRule(),
+    @pytest.mark.parametrize("hit_rule_type", [
+        "crit_auto_wound",
+        "crit_mortal_wound",
+        "crit_double_hit",
     ])
-    def test_crit_increases_mean(self, standard_config, normal_mean, crit_rule):
-        crit_mean = _mean(compute_damages(standard_config, _crit_sequence(crit_rule)))
+    def test_crit_increases_mean(self, standard_config, normal_mean, hit_rule_type):
+        crit_mean = _mean(compute_damages(standard_config, hit_rule_type))
         assert crit_mean > normal_mean
 
-    @pytest.mark.parametrize("crit_rule", [
-        CritAutoWoundRule(),
-        CritMortalWoundRule(),
-        CritDoubleHitRule(),
+    @pytest.mark.parametrize("hit_rule_type", [
+        "crit_auto_wound",
+        "crit_mortal_wound",
+        "crit_double_hit",
     ])
-    def test_crit_increases_mean_at_six_plus(self, crit_rule):
+    def test_crit_increases_mean_at_six_plus(self, hit_rule_type):
         """Crit benefit is most pronounced when only crits hit (6+)."""
         config = CombatConfig(
             AttackStats(10, 6, 3, 0, 1), DefenseStats(4, None), None,
         )
-        normal = _mean(compute_damages(config, STANDARD_SEQUENCE))
-        crit = _mean(compute_damages(config, _crit_sequence(crit_rule)))
+        normal = _mean(compute_damages(config, "normal"))
+        crit = _mean(compute_damages(config, hit_rule_type))
         assert crit > normal
 
-    @pytest.mark.parametrize("crit_rule", [
-        CritAutoWoundRule(),
-        CritMortalWoundRule(),
-        CritDoubleHitRule(),
+    @pytest.mark.parametrize("hit_rule_type", [
+        "crit_auto_wound",
+        "crit_mortal_wound",
+        "crit_double_hit",
     ])
-    def test_crit_increases_mean_with_ward(self, crit_rule):
+    def test_crit_increases_mean_with_ward(self, hit_rule_type):
         """Crit rules should still increase damage when a ward save is present."""
         config = CombatConfig(
             AttackStats(10, 3, 3, 1, 2), DefenseStats(4, 5), None,
         )
-        normal = _mean(compute_damages(config, WARD_SEQUENCE))
-        crit = _mean(compute_damages(config, _crit_sequence(crit_rule) + [WardRule()]))
+        normal = _mean(compute_damages(config, "normal"))
+        crit = _mean(compute_damages(config, hit_rule_type))
         assert crit > normal
 
 
@@ -216,8 +193,8 @@ class TestWardReducesDamage:
             AttackStats(attacks, to_hit, to_wound, rend, dmg),
             DefenseStats(save, None), None,
         )
-        mean_with = _mean(compute_damages(config_ward, WARD_SEQUENCE))
-        mean_without = _mean(compute_damages(config_no_ward, STANDARD_SEQUENCE))
+        mean_with = _mean(compute_damages(config_ward, "normal"))
+        mean_without = _mean(compute_damages(config_no_ward, "normal"))
         assert mean_with < mean_without
 
     def test_stronger_ward_reduces_more(self):
@@ -226,6 +203,6 @@ class TestWardReducesDamage:
         config_4plus = CombatConfig(attack_stats, DefenseStats(4, 4), None)
         config_5plus = CombatConfig(attack_stats, DefenseStats(4, 5), None)
 
-        mean_4 = _mean(compute_damages(config_4plus, WARD_SEQUENCE))
-        mean_5 = _mean(compute_damages(config_5plus, WARD_SEQUENCE))
+        mean_4 = _mean(compute_damages(config_4plus, "normal"))
+        mean_5 = _mean(compute_damages(config_5plus, "normal"))
         assert mean_4 < mean_5
