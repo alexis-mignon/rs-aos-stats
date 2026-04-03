@@ -130,7 +130,10 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.python-version }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install test dependencies
-        run: pip install maturin pytest hypothesis nbformat nbclient numpy matplotlib ipywidgets
+        run: pip install maturin pytest hypothesis nbformat nbclient ipykernel numpy matplotlib ipywidgets
+
+      - name: Register Python kernel for notebook tests
+        run: python -m ipykernel install --user --name python3 --display-name "Python 3"
 
       - name: Build Python package
         run: maturin build --features python --out dist

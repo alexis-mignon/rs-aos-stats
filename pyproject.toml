@@ -19,6 +19,7 @@ dev = [
     "hypothesis",
     "nbformat",
     "nbclient",
+    "ipykernel",
     "numpy",
     "matplotlib",
     "ipywidgets",
