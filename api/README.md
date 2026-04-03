@@ -31,17 +31,17 @@ FastAPI-based REST API for calculating combat damage probabilities in Age of Sig
 
 Number of attacks. Accepts fixed values or dice notation.
 
-**Format regex:** `^(\d+|D[36]|\d+D[36]|\d*D[36]\+\d+)$`
+**Format regex:** `^(?:\d+|(?:[1-9]\d*)?D[36](?:\+\d+)?)$`
 
 **Valid formats:**
-- Fixed value: `"1"`, `"2"`, `"10"`, `"40"`
+- Fixed value: `"0"`, `"1"`, `"10"`
 - Simple die: `"D3"`, `"D6"` (case-sensitive)
-- Multiple dice: `"2D3"`, `"2D6"`, `"40D6"`
-- Dice with modifier: `"D3+1"`, `"2D6+3"`, `"10D6+5"`
+- Multiple dice: `"2D3"`, `"2D6"`, `"50D6"`
+- Dice with modifier: `"D3+1"`, `"2D6+3"`, `"50D6+5"`
 
 **Constraints:**
-- N (multiplier) range: 1-40
-- M (modifier) range: 0-20
+- N (multiplier): integer between 1 and 50 when present
+- M (modifier): non-negative integer
 - Allowed die faces: 3, 6 only
 - Case-sensitive: 'D' must be uppercase
 - No spaces allowed
@@ -74,17 +74,17 @@ Rend/AP (armor penetration) value.
 
 Damage per successful hit. Accepts fixed values or dice notation.
 
-**Format regex:** `^(\d+|D[36]|\d+D[36]|\d*D[36]\+\d+)$`
+**Format regex:** `^(?:\d+|(?:[1-9]\d*)?D[36](?:\+\d+)?)$`
 
 **Valid formats:**
-- Fixed value: `"1"`, `"2"`, `"10"`
+- Fixed value: `"0"`, `"1"`, `"10"`
 - Simple die: `"D3"`, `"D6"`
 - Multiple dice: `"2D3"`, `"2D6"`
 - Dice with modifier: `"D3+1"`, `"2D6+3"`
 
 **Constraints:**
-- N (multiplier) range: 1-10
-- M (modifier) range: 0-20
+- N (multiplier): integer between 1 and 50 when present
+- M (modifier): non-negative integer
 - Allowed die faces: 3, 6 only
 - Case-sensitive: 'D' must be uppercase
 - No spaces allowed
@@ -319,8 +319,8 @@ CORS is enabled for all origins, allowing the API to be called from web applicat
 |------|---------|----------|-------|
 | Fixed | `^\d+$` | `"1"`, `"10"`, `"40"` | String containing integer |
 | Simple die | `^D[36]$` | `"D3"`, `"D6"` | Uppercase D only |
-| Multiple dice | `^\d+D[36]$` | `"2D6"`, `"10D3"`, `"40D6"` | N between 1-40 (attacks) or 1-10 (damage) |
-| Dice + modifier | `^\d*D[36]\+\d+$` | `"D3+1"`, `"2D6+3"`, `"5D3+10"` | Modifier M between 0-20 |
+| Multiple dice | `^\d+D[36]$` | `"2D6"`, `"10D3"`, `"50D6"` | N between 1 and 50 |
+| Dice + modifier | `^\d*D[36]\+\d+$` | `"D3+1"`, `"2D6+3"`, `"50D6+5"` | N between 1 and 50, modifier M non-negative |
 
 ### Parameter Constraints Table
 
@@ -371,5 +371,3 @@ Based on comprehensive testing, crit rules provide the following typical damage 
 - Test coverage: 24 test cases across 8 different scenarios verified
 
 To verify: Run `python3 api/test_crit_rules.py`
-
-

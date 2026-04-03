@@ -1,4 +1,4 @@
-use crate::probabilities::dice::DiceRoll;
+use crate::probabilities::dice::{validate_dice_count, DiceRoll};
 use pyo3::exceptions::{PyNotImplementedError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::PyClass;
@@ -8,6 +8,10 @@ use pyo3::PyClass;
 
 fn _wrap_type<T: PyClass>(py: Python, obj: impl Into<PyClassInitializer<T>>) -> PyResult<PyObject> {
     Ok(Py::new(py, obj)?.into_any())
+}
+
+fn validate_dice_count_py(n: u32) -> PyResult<()> {
+    validate_dice_count(n).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
 #[pyclass(name = "DiceRoll", subclass)]
@@ -33,12 +37,12 @@ impl DiceRollPy {
         match dice {
             Ok(DiceRoll::D3) => _wrap_type(py, D3::new()),
             Ok(DiceRoll::D6) => _wrap_type(py, D6::new()),
-            Ok(DiceRoll::ND3(n)) => _wrap_type(py, ND3::new(n)),
-            Ok(DiceRoll::ND6(n)) => _wrap_type(py, ND6::new(n)),
+            Ok(DiceRoll::ND3(n)) => _wrap_type(py, ND3::new(n)?),
+            Ok(DiceRoll::ND6(n)) => _wrap_type(py, ND6::new(n)?),
             Ok(DiceRoll::D3Plus(m)) => _wrap_type(py, D3Plus::new(m)),
             Ok(DiceRoll::D6Plus(m)) => _wrap_type(py, D6Plus::new(m)),
-            Ok(DiceRoll::ND3Plus(n, m)) => _wrap_type(py, ND3Plus::new(n, m)),
-            Ok(DiceRoll::ND6Plus(n, m)) => _wrap_type(py, ND6Plus::new(n, m)),
+            Ok(DiceRoll::ND3Plus(n, m)) => _wrap_type(py, ND3Plus::new(n, m)?),
+            Ok(DiceRoll::ND6Plus(n, m)) => _wrap_type(py, ND6Plus::new(n, m)?),
             Err(e) => Err(PyValueError::new_err(e.to_string())),
         }
     }
@@ -88,8 +92,9 @@ pub struct ND6 {
 #[pymethods]
 impl ND6 {
     #[new]
-    fn new(n: u32) -> (Self, DiceRollPy) {
-        (ND6 { n }, DiceRollPy)
+    fn new(n: u32) -> PyResult<(Self, DiceRollPy)> {
+        validate_dice_count_py(n)?;
+        Ok((ND6 { n }, DiceRollPy))
     }
 
     fn values_and_probas(&self) -> PyResult<Vec<(u32, f64)>> {
@@ -107,8 +112,9 @@ pub struct ND3 {
 #[pymethods]
 impl ND3 {
     #[new]
-    fn new(n: u32) -> (Self, DiceRollPy) {
-        (ND3 { n }, DiceRollPy)
+    fn new(n: u32) -> PyResult<(Self, DiceRollPy)> {
+        validate_dice_count_py(n)?;
+        Ok((ND3 { n }, DiceRollPy))
     }
 
     fn values_and_probas(&self) -> PyResult<Vec<(u32, f64)>> {
@@ -161,8 +167,9 @@ pub struct ND6Plus {
 #[pymethods]
 impl ND6Plus {
     #[new]
-    fn new(n: u32, m: u32) -> (Self, DiceRollPy) {
-        (ND6Plus { n, m }, DiceRollPy)
+    fn new(n: u32, m: u32) -> PyResult<(Self, DiceRollPy)> {
+        validate_dice_count_py(n)?;
+        Ok((ND6Plus { n, m }, DiceRollPy))
     }
 
     fn values_and_probas(&self) -> PyResult<Vec<(u32, f64)>> {
@@ -181,8 +188,9 @@ pub struct ND3Plus {
 #[pymethods]
 impl ND3Plus {
     #[new]
-    fn new(n: u32, m: u32) -> (Self, DiceRollPy) {
-        (ND3Plus { n, m }, DiceRollPy)
+    fn new(n: u32, m: u32) -> PyResult<(Self, DiceRollPy)> {
+        validate_dice_count_py(n)?;
+        Ok((ND3Plus { n, m }, DiceRollPy))
     }
 
     fn values_and_probas(&self) -> PyResult<Vec<(u32, f64)>> {

@@ -1,8 +1,33 @@
+import re
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
 import rs_aos_stats as aos
+
+
+CHARACTERISTIC_PATTERN = re.compile(r"(?:\d+|(?:[1-9]\d*)?D[36](?:\+\d+)?)")
+MAX_DICE_COUNT = 50
+
+
+def parse_characteristic(value: str):
+    if not CHARACTERISTIC_PATTERN.fullmatch(value):
+        raise ValueError(
+            f"Invalid characteristic '{value}'. Expected a non-negative integer or "
+            "dice notation such as 'D6', '2D3', or '2D6+3'."
+        )
+
+    if value.isdigit():
+        return int(value)
+
+    prefix, _ = value.split("D", 1)
+    dice_count = int(prefix) if prefix else 1
+    if dice_count > MAX_DICE_COUNT:
+        raise ValueError(
+            f"Dice count {dice_count} exceeds maximum of {MAX_DICE_COUNT}."
+        )
+
+    return value
 
 app = FastAPI(
     title="Age of Sigmar Damage Calculator API",
@@ -25,17 +50,18 @@ class CombatParams(BaseModel):
     Combat parameters for damage calculation.
 
     Characteristic Format Specification:
-    - Fixed value: String containing integer (e.g., "1", "10", "40")
+    - Fixed value: String containing a non-negative integer (e.g., "0", "1", "10")
     - Simple dice: "D3" or "D6" (exactly as shown, case-sensitive)
-    - Multiple dice: "<N>D3" or "<N>D6" where N is 1-40 (e.g., "2D6", "3D3")
-    - Dice with modifier: "<N>D<faces>+<M>" where N is 1-40, faces is 3 or 6, M is 0-20
-      (e.g., "2D6+3", "D3+1")
+        - Multiple dice: "<N>D3" or "<N>D6" where N is an integer between 1 and 50
+            (e.g., "2D6", "3D3")
+        - Dice with modifier: "<N>D<faces>+<M>" where N is between 1 and 50,
+            faces is 3 or 6, and M is a non-negative integer (e.g., "2D6+3", "D3+1")
 
     All string formats are case-sensitive. No spaces allowed in characteristic strings.
     """
     attacks_characteristic: str = Field(
         ...,
-        description="Number of attacks. Format: Fixed value '1'-'40', 'D3', 'D6', 'ND3', 'ND6', 'ND3+M', or 'ND6+M'",
+        description="Number of attacks. Format: non-negative integer or dice notation such as 'D6', '2D3', or '2D6+3'.",
         examples=["10", "D6", "2D6", "2D6+3"]
     )
     to_hit: int = Field(
@@ -57,7 +83,7 @@ class CombatParams(BaseModel):
     )
     damage_characteristic: str = Field(
         ...,
-        description="Damage per hit. Format: Fixed value '1'-'10', 'D3', 'D6', 'ND3', 'ND6', 'ND3+M', or 'ND6+M'",
+        description="Damage per hit. Format: non-negative integer or dice notation such as 'D3', 'D6', or '2D6+3'.",
         examples=["1", "D3", "D6", "2D6"]
     )
     save: int = Field(
@@ -74,7 +100,10 @@ class CombatParams(BaseModel):
     )
     hit_rule_type: Literal["normal", "crit_auto_wound", "crit_mortal_wound", "crit_double_hit"] = Field(
         default="normal",
-        description="Hit rule type. Must be exactly one of: 'normal', 'crit_auto_wound', 'crit_mortal_wound', 'crit_double_hit'"
+        description=(
+            "Hit rule type. Must be exactly one of: "
+            "'normal', 'crit_auto_wound', 'crit_mortal_wound', 'crit_double_hit'"
+        )
     )
 
 
@@ -104,19 +133,19 @@ async def calculate_damage(params: CombatParams):
 
     Both `attacks_characteristic` and `damage_characteristic` use the same format:
 
-    **Pattern:** `^(\d+|D[36]|\d+D[36]|\d*D[36]\+\d+)$`
+    **Pattern:** `^(?:\\d+|(?:[1-9]\\d*)?D[36](?:\\+\\d+)?)$`
 
     Valid formats (case-sensitive, no spaces):
-    - Fixed integer: "1", "2", "10", "40"
+    - Fixed integer: "0", "1", "10"
     - Simple die: "D3", "D6"
-    - Multiple dice: "2D3", "2D6", "40D6"
-    - Dice with modifier: "D3+1", "2D6+3", "3D3+10"
+    - Multiple dice: "2D3", "2D6", "50D6"
+    - Dice with modifier: "D3+1", "2D6+3", "50D6+5"
 
     **Important:**
     - 'D' must be uppercase
     - No spaces in the string
-    - N (multiplier): 1-40 for attacks, 1-10 for damage
-    - M (modifier): 0-20
+    - N (multiplier): integer between 1 and 50 when present
+    - M (modifier): non-negative integer
     - Faces: Only 3 or 6 are valid
 
     ### Integer Parameters
@@ -150,14 +179,6 @@ async def calculate_damage(params: CombatParams):
     - 422: Request validation error (Pydantic)
     """
     try:
-        # Convert characteristics to appropriate types
-        # If it's a plain number, convert to int, otherwise keep as string for dice notation
-        def parse_characteristic(value: str):
-            try:
-                return int(value)
-            except ValueError:
-                return value
-
         attacks = parse_characteristic(params.attacks_characteristic)
         damage = parse_characteristic(params.damage_characteristic)
 
