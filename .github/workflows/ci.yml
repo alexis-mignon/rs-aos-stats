@@ -140,3 +140,23 @@ jobs:
 
       - name: Run Python tests
         run: pytest tests/ -v
+
+  python-quality:
+    name: Python Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install quality tools
+        run: pip install ruff mypy
+
+      - name: Run Ruff lint
+        run: ruff check api tests
+
+      - name: Run mypy
+        run: mypy --config-file pyproject.toml

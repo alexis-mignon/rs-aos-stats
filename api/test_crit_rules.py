@@ -8,7 +8,7 @@ and that they always provide a benefit compared to normal hit rules.
 
 import json
 import subprocess
-import sys
+from typing import Any
 
 
 def call_api(params):
@@ -25,7 +25,7 @@ def call_api(params):
 def test_crit_rules_increase_damage():
     """Test that all crit rules increase average damage compared to normal"""
 
-    test_cases = [
+    test_cases: list[dict[str, Any]] = [
         {
             "name": "Standard profile (10A, 3+/3+, -1 rend, 1D, 4+ save)",
             "params": {
@@ -138,9 +138,9 @@ def test_crit_rules_increase_damage():
         print(f"\n{test_case['name']}")
         print("-" * 80)
 
-        results = {}
+        results: dict[str, float] = {}
         for rule in hit_rules:
-            params = test_case['params'].copy()
+            params = dict(test_case['params'])
             params['hit_rule_type'] = rule
             result = call_api(params)
             mean = result['mean_damage']

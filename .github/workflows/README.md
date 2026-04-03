@@ -13,6 +13,7 @@ Exécuté sur chaque push et pull request vers `main`.
 - **check-rust** : Vérification du formatage (rustfmt) et linting (clippy)
 - **build-wasm** : Compilation WebAssembly pour vérifier que ça build
 - **test-python** : Tests des bindings Python sur Linux, macOS, Windows avec Python 3.9-3.13
+- **python-quality** : Qualité Python (ruff + mypy)
 
 ### 2. Deploy (`deploy.yml`)
 
