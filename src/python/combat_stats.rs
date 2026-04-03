@@ -28,7 +28,7 @@ impl CharacteristicPy {
                 ),
             })
         } else {
-            Err(PyValueError::new_err("Could not convert to Characteritic"))
+            Err(PyValueError::new_err("Could not convert to Characteristic"))
         }
     }
 }
