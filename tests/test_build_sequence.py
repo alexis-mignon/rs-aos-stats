@@ -7,31 +7,23 @@ import rs_aos_stats as aos
 
 
 def test_build_standard_sequence():
-    """Test that build_standard_sequence creates correct rule sequences"""
-
-    # Test configuration
-    attack_stats = aos.AttackStats(10, 3, 3, 1, 1)
-    defense_stats = aos.DefenseStats(4, 5)  # 4+ save, 5+ ward
-    config = aos.CombatConfig(attack_stats, defense_stats, None)
+    """Test that build_standard_sequence mirrors the per-attack pipeline."""
 
     test_cases = [
-        ("normal", False),
-        ("normal", True),
-        ("crit_auto_wound", False),
-        ("crit_mortal_wound", True),
-        ("crit_double_hit", False),
+        ("normal", False, ["HitRule", "WoundRule", "SaveRule", "DamagesRule"]),
+        ("normal", True, ["HitRule", "WoundRule", "SaveRule", "DamagesRule", "WardRule"]),
+        ("crit_auto_wound", False, ["CritAutoWoundRule", "WoundRule", "SaveRule", "DamagesRule"]),
+        ("crit_mortal_wound", True, ["CritMortalWoundRule", "WoundRule", "SaveRule", "DamagesRule", "WardRule"]),
+        ("crit_double_hit", False, ["CritDoubleHitRule", "WoundRule", "SaveRule", "DamagesRule"]),
     ]
 
-    for hit_rule_type, has_ward in test_cases:
+    for hit_rule_type, has_ward, expected_sequence in test_cases:
         # Build sequence using the helper
         sequence = aos.build_standard_sequence(hit_rule_type, has_ward)
 
         # Verify sequence structure
         rule_types = [type(r).__name__ for r in sequence]
-        expected_length = 6 if has_ward else 5
-
-        assert len(sequence) == expected_length, f"Expected {expected_length} rules, got {len(sequence)}"
-        assert rule_types[0] == "AttackCharacteristicRule", "Should start with AttackCharacteristicRule"
+        assert rule_types == expected_sequence, f"Expected {expected_sequence}, got {rule_types}"
         if has_ward:
             assert "WardRule" in rule_types, "Should include WardRule when has_ward=True"
             ward_idx = rule_types.index("WardRule")

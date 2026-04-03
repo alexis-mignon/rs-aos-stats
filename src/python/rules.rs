@@ -1,8 +1,9 @@
 /// Python wrappers for the Rust rule implementations.
 ///
-/// Rule classes are kept as marker types for backward compatibility
-/// (e.g. test_rules.py tests instantiation). The actual pipeline
-/// is now driven by `compute_damages(config, hit_rule_type)`.
+/// These classes mirror the per-attack phases used internally by
+/// `compute_damages(config, hit_rule_type)`. Attack-count handling is
+/// resolved inside `compute_damages`, so the exported sequence starts
+/// directly at the hit-rule phase.
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
@@ -48,18 +49,6 @@ pub struct DamagesRulePy;
 
 #[pymethods]
 impl DamagesRulePy {
-    #[new]
-    fn new() -> Self {
-        Self {}
-    }
-}
-
-#[pyclass(name = "AttackCharacteristicRule")]
-#[derive(Clone, Debug)]
-pub struct AttackCharacteristicRulePy;
-
-#[pymethods]
-impl AttackCharacteristicRulePy {
     #[new]
     fn new() -> Self {
         Self {}
@@ -119,7 +108,6 @@ pub fn register_rules(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<WoundRulePy>()?;
     m.add_class::<SaveRulePy>()?;
     m.add_class::<DamagesRulePy>()?;
-    m.add_class::<AttackCharacteristicRulePy>()?;
     m.add_class::<WardRulePy>()?;
     m.add_class::<CritAutoWoundRulePy>()?;
     m.add_class::<CritMortalWoundRulePy>()?;
@@ -134,8 +122,6 @@ pub fn build_standard_sequence_py(
     has_ward: bool,
 ) -> PyResult<Vec<PyObject>> {
     let mut rules: Vec<PyObject> = Vec::new();
-
-    rules.push(Py::new(py, AttackCharacteristicRulePy)?.into());
 
     match hit_rule_type {
         "normal" => {

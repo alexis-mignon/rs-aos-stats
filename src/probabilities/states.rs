@@ -2,12 +2,6 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Initial;
 
-/// State after resolving the number of attacks from the profile characteristic.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Attacked {
-    pub attacks: u32,
-}
-
 /// State after the hit roll (and any crit effects).
 ///
 /// - `hits`: successful hits to be wound-rolled.

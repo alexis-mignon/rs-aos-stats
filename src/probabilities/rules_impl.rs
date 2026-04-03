@@ -43,9 +43,9 @@ where
 ///
 /// Concrete rules only need to decide how the partition counts map to
 /// `(hits, wounds, mortal_wounds)` via `result`.
-pub(crate) trait BaseHitRule: TestRollRule<Attacked, Hit> {
-    fn hit_roll_count(&self, state: &Attacked) -> u32 {
-        state.attacks
+pub(crate) trait BaseHitRule: TestRollRule<Initial, Hit> {
+    fn hit_roll_count(&self, _state: &Initial) -> u32 {
+        1
     }
 
     fn hit_partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
@@ -71,7 +71,7 @@ pub(crate) trait BaseHitRule: TestRollRule<Attacked, Hit> {
 
     fn result(&self, partition: &[u32]) -> (u32, u32, u32);
 
-    fn hit_build_state(&self, _state: &Attacked, counts: &[u32]) -> Hit {
+    fn hit_build_state(&self, _state: &Initial, counts: &[u32]) -> Hit {
         let (hits, wounds, mortal_wounds) = self.result(counts);
         Hit {
             hits,
@@ -82,33 +82,7 @@ pub(crate) trait BaseHitRule: TestRollRule<Attacked, Hit> {
 }
 
 // ---------------------------------------------------------------------------
-// AttackCharacteristicRule: Initial → Attacked
-// ---------------------------------------------------------------------------
-
-#[derive(Clone, Debug)]
-pub struct AttackCharacteristicRule;
-
-impl Rule<Initial, Attacked> for AttackCharacteristicRule {
-    fn apply(
-        &self,
-        _state: &Initial,
-        probability: f64,
-        config: &CombatConfig,
-    ) -> Vec<(Attacked, f64)> {
-        let values_and_probas = match config.attack_stats.attacks {
-            Characteristic::Value(value) => vec![(value, 1.0)],
-            Characteristic::DiceRoll(roll) => roll.values_and_probas(),
-        };
-
-        values_and_probas
-            .iter()
-            .map(|(value, proba)| (Attacked { attacks: *value }, probability * proba))
-            .collect()
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Hit rules: Attacked → Hit
+// Hit rules: Initial → Hit
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
@@ -120,26 +94,26 @@ impl BaseHitRule for HitRule {
     }
 }
 
-impl TestRollRule<Attacked, Hit> for HitRule {
-    fn roll_count(&self, state: &Attacked) -> u32 {
+impl TestRollRule<Initial, Hit> for HitRule {
+    fn roll_count(&self, state: &Initial) -> u32 {
         BaseHitRule::hit_roll_count(self, state)
     }
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
         BaseHitRule::hit_partition_prior(self, config)
     }
-    fn build_state(&self, state: &Attacked, counts: &[u32]) -> Hit {
+    fn build_state(&self, state: &Initial, counts: &[u32]) -> Hit {
         BaseHitRule::hit_build_state(self, state, counts)
     }
 }
 
-impl Rule<Attacked, Hit> for HitRule {
-    fn apply(&self, state: &Attacked, probability: f64, config: &CombatConfig) -> Vec<(Hit, f64)> {
+impl Rule<Initial, Hit> for HitRule {
+    fn apply(&self, state: &Initial, probability: f64, config: &CombatConfig) -> Vec<(Hit, f64)> {
         TestRollRule::apply_distribution(self, state, probability, config)
     }
 }
 
 // ---------------------------------------------------------------------------
-// CritMortalWoundRule: Attacked → Hit
+// CritMortalWoundRule: Initial → Hit
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
@@ -151,26 +125,26 @@ impl BaseHitRule for CritMortalWoundRule {
     }
 }
 
-impl TestRollRule<Attacked, Hit> for CritMortalWoundRule {
-    fn roll_count(&self, state: &Attacked) -> u32 {
+impl TestRollRule<Initial, Hit> for CritMortalWoundRule {
+    fn roll_count(&self, state: &Initial) -> u32 {
         BaseHitRule::hit_roll_count(self, state)
     }
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
         BaseHitRule::hit_partition_prior(self, config)
     }
-    fn build_state(&self, state: &Attacked, counts: &[u32]) -> Hit {
+    fn build_state(&self, state: &Initial, counts: &[u32]) -> Hit {
         BaseHitRule::hit_build_state(self, state, counts)
     }
 }
 
-impl Rule<Attacked, Hit> for CritMortalWoundRule {
-    fn apply(&self, state: &Attacked, probability: f64, config: &CombatConfig) -> Vec<(Hit, f64)> {
+impl Rule<Initial, Hit> for CritMortalWoundRule {
+    fn apply(&self, state: &Initial, probability: f64, config: &CombatConfig) -> Vec<(Hit, f64)> {
         TestRollRule::apply_distribution(self, state, probability, config)
     }
 }
 
 // ---------------------------------------------------------------------------
-// CritAutoWoundRule: Attacked → Hit
+// CritAutoWoundRule: Initial → Hit
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
@@ -182,26 +156,26 @@ impl BaseHitRule for CritAutoWoundRule {
     }
 }
 
-impl TestRollRule<Attacked, Hit> for CritAutoWoundRule {
-    fn roll_count(&self, state: &Attacked) -> u32 {
+impl TestRollRule<Initial, Hit> for CritAutoWoundRule {
+    fn roll_count(&self, state: &Initial) -> u32 {
         BaseHitRule::hit_roll_count(self, state)
     }
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
         BaseHitRule::hit_partition_prior(self, config)
     }
-    fn build_state(&self, state: &Attacked, counts: &[u32]) -> Hit {
+    fn build_state(&self, state: &Initial, counts: &[u32]) -> Hit {
         BaseHitRule::hit_build_state(self, state, counts)
     }
 }
 
-impl Rule<Attacked, Hit> for CritAutoWoundRule {
-    fn apply(&self, state: &Attacked, probability: f64, config: &CombatConfig) -> Vec<(Hit, f64)> {
+impl Rule<Initial, Hit> for CritAutoWoundRule {
+    fn apply(&self, state: &Initial, probability: f64, config: &CombatConfig) -> Vec<(Hit, f64)> {
         TestRollRule::apply_distribution(self, state, probability, config)
     }
 }
 
 // ---------------------------------------------------------------------------
-// CritDoubleHitRule: Attacked → Hit
+// CritDoubleHitRule: Initial → Hit
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
@@ -213,20 +187,20 @@ impl BaseHitRule for CritDoubleHitRule {
     }
 }
 
-impl TestRollRule<Attacked, Hit> for CritDoubleHitRule {
-    fn roll_count(&self, state: &Attacked) -> u32 {
+impl TestRollRule<Initial, Hit> for CritDoubleHitRule {
+    fn roll_count(&self, state: &Initial) -> u32 {
         BaseHitRule::hit_roll_count(self, state)
     }
     fn partition_prior(&self, config: &CombatConfig) -> Vec<f64> {
         BaseHitRule::hit_partition_prior(self, config)
     }
-    fn build_state(&self, state: &Attacked, counts: &[u32]) -> Hit {
+    fn build_state(&self, state: &Initial, counts: &[u32]) -> Hit {
         BaseHitRule::hit_build_state(self, state, counts)
     }
 }
 
-impl Rule<Attacked, Hit> for CritDoubleHitRule {
-    fn apply(&self, state: &Attacked, probability: f64, config: &CombatConfig) -> Vec<(Hit, f64)> {
+impl Rule<Initial, Hit> for CritDoubleHitRule {
+    fn apply(&self, state: &Initial, probability: f64, config: &CombatConfig) -> Vec<(Hit, f64)> {
         TestRollRule::apply_distribution(self, state, probability, config)
     }
 }
@@ -323,52 +297,7 @@ pub struct DamagesRule;
 
 impl DamagesRule {
     fn random_damages(roll: DiceRoll, num_wounds: u32) -> Vec<(u32, f64)> {
-        let n = num_wounds as usize;
-        if n == 0 {
-            return vec![(0, 1.0)];
-        }
-
-        let single = roll.values_and_probas();
-        let max_single = single.iter().map(|(v, _)| *v as usize).max().unwrap_or(0);
-
-        if max_single == 0 {
-            return vec![(0, 1.0)];
-        }
-
-        let max_total = max_single * n;
-        let mut dist = vec![0.0_f64; max_total + 1];
-        dist[0] = 1.0;
-
-        for _ in 0..n {
-            let mut new_dist = vec![0.0_f64; max_total + 1];
-            for (sum, &p_sum) in dist.iter().enumerate() {
-                if p_sum == 0.0 {
-                    continue;
-                }
-                for (d, p_d) in &single {
-                    let new_sum = sum + *d as usize;
-                    if new_sum <= max_total {
-                        new_dist[new_sum] += p_sum * p_d;
-                    }
-                }
-            }
-            dist = new_dist;
-        }
-
-        let mut results: Vec<(u32, f64)> = dist
-            .iter()
-            .enumerate()
-            .filter_map(|(damage, &p)| {
-                if p > 0.0 {
-                    Some((damage as u32, p))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        results.sort_by_key(|(d, _)| *d);
-        results
+        crate::probabilities::convolution::convolve_n(&roll.values_and_probas(), num_wounds)
     }
 }
 
@@ -467,17 +396,33 @@ impl std::str::FromStr for HitRuleVariant {
 
 /// Compute the exact damage probability distribution for a combat profile.
 ///
-/// This is the main entry point. It builds a type-safe pipeline internally,
-/// so misordering rules is impossible.
+/// This is the main entry point. It runs the pipeline for a single attack,
+/// then convolves the result N times for N attacks. For random attack counts
+/// (dice), it marginalizes over possible values.
 pub fn compute_damages(config: CombatConfig, hit_variant: HitRuleVariant) -> Vec<(u32, f64)> {
+    use crate::probabilities::convolution::{convolve_n, mix};
+
+    let single = compute_single_attack(&config, hit_variant);
+    let attack_values = config.attack_stats.attacks.values_and_probas();
+
+    let convolved: Vec<Vec<(u32, f64)>> = attack_values
+        .iter()
+        .map(|(n, _)| convolve_n(&single, *n))
+        .collect();
+    let components: Vec<(&[(u32, f64)], f64)> = convolved
+        .iter()
+        .zip(attack_values.iter())
+        .map(|(dist, (_, p))| (dist.as_slice(), *p))
+        .collect();
+    mix(&components)
+}
+
+/// Run the pipeline for a single attack, returning the damage distribution.
+fn compute_single_attack(config: &CombatConfig, hit_variant: HitRuleVariant) -> Vec<(u32, f64)> {
     use crate::probabilities::compute_engine::PipelineBuilder;
 
     let has_ward = config.defense_stats.ward.is_some();
-    let after_attacks = PipelineBuilder::new().add_rule(AttackCharacteristicRule);
 
-    // All hit rule variants produce PipelineBuilder<Hit>, but since
-    // each branch returns a different concrete type we need to run
-    // through the rest of the pipeline in each arm.
     macro_rules! finish_pipeline {
         ($after_hits:expr, $config:expr, $has_ward:expr) => {{
             let after_damage = $after_hits
@@ -494,20 +439,28 @@ pub fn compute_damages(config: CombatConfig, hit_variant: HitRuleVariant) -> Vec
 
     match hit_variant {
         HitRuleVariant::Normal => {
-            finish_pipeline!(after_attacks.add_rule(HitRule), config, has_ward)
+            finish_pipeline!(PipelineBuilder::new().add_rule(HitRule), config, has_ward)
         }
         HitRuleVariant::CritAutoWound => {
-            finish_pipeline!(after_attacks.add_rule(CritAutoWoundRule), config, has_ward)
+            finish_pipeline!(
+                PipelineBuilder::new().add_rule(CritAutoWoundRule),
+                config,
+                has_ward
+            )
         }
         HitRuleVariant::CritMortalWound => {
             finish_pipeline!(
-                after_attacks.add_rule(CritMortalWoundRule),
+                PipelineBuilder::new().add_rule(CritMortalWoundRule),
                 config,
                 has_ward
             )
         }
         HitRuleVariant::CritDoubleHit => {
-            finish_pipeline!(after_attacks.add_rule(CritDoubleHitRule), config, has_ward)
+            finish_pipeline!(
+                PipelineBuilder::new().add_rule(CritDoubleHitRule),
+                config,
+                has_ward
+            )
         }
     }
 }
