@@ -7,7 +7,7 @@ use crate::python::combat_stats::{
     AttackStatsPy, CharacteristicPy, DefenseStatsPy, RollModifierPy,
 };
 use crate::python::combat_tree::{compute_damages_py, CombatConfigPy};
-use crate::python::dice::{DiceRollPy, ND3Plus, ND6Plus, D3, D6, ND3, ND6};
+use crate::python::dice::{D3Plus, D6Plus, DiceRollPy, ND3Plus, ND6Plus, D3, D6, ND3, ND6};
 use crate::python::rules::{build_standard_sequence_py, register_rules};
 use pyo3::prelude::*;
 
@@ -20,6 +20,8 @@ fn rs_aos_stats(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ND3>()?;
     m.add_class::<ND6Plus>()?;
     m.add_class::<ND3Plus>()?;
+    m.add_class::<D3Plus>()?;
+    m.add_class::<D6Plus>()?;
     // Add combat stats objects
     m.add_class::<CharacteristicPy>()?;
     m.add_class::<AttackStatsPy>()?;

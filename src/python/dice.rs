@@ -202,6 +202,10 @@ impl TryFrom<&Bound<'_, PyAny>> for DiceRoll {
             Ok(DiceRoll::ND3(nd3.n))
         } else if let Ok(nd6) = value.extract::<ND6>() {
             Ok(DiceRoll::ND6(nd6.n))
+        } else if let Ok(d3plus) = value.extract::<D3Plus>() {
+            Ok(DiceRoll::D3Plus(d3plus.m))
+        } else if let Ok(d6plus) = value.extract::<D6Plus>() {
+            Ok(DiceRoll::D6Plus(d6plus.m))
         } else if let Ok(nd3plus) = value.extract::<ND3Plus>() {
             Ok(DiceRoll::ND3Plus(nd3plus.n, nd3plus.m))
         } else if let Ok(nd6plus) = value.extract::<ND6Plus>() {
@@ -226,6 +230,10 @@ impl TryFrom<Bound<'_, PyAny>> for DiceRoll {
             Ok(DiceRoll::ND3(nd3.n))
         } else if let Ok(nd6) = value.extract::<ND6>() {
             Ok(DiceRoll::ND6(nd6.n))
+        } else if let Ok(d3plus) = value.extract::<D3Plus>() {
+            Ok(DiceRoll::D3Plus(d3plus.m))
+        } else if let Ok(d6plus) = value.extract::<D6Plus>() {
+            Ok(DiceRoll::D6Plus(d6plus.m))
         } else if let Ok(nd3plus) = value.extract::<ND3Plus>() {
             Ok(DiceRoll::ND3Plus(nd3plus.n, nd3plus.m))
         } else if let Ok(nd6plus) = value.extract::<ND6Plus>() {
